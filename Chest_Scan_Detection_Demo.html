@@ -1,0 +1,896 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Radiographic Screening — Pneumonia Classifier</title>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/tensorflow/4.22.0/tf.min.js"></script>
+<style>
+  :root{
+    --bg:#101317;
+    --panel:#171b20;
+    --panel-2:#1d2228;
+    --line:#2b3138;
+    --film:#e7edf1;
+    --film-dim:#8ea0ab;
+    --film-faint:#5b6b75;
+    --amber:#e2a23c;
+    --amber-dim:#7a5a26;
+    --teal:#4fa3a0;
+    --red:#c0563f;
+    --mono: 'IBM Plex Mono', 'SFMono-Regular', Menlo, monospace;
+    --sans: 'Inter', -apple-system, 'Segoe UI', sans-serif;
+  }
+  @font-face{ font-family:'Inter'; src:local('Inter'); }
+  *{ box-sizing:border-box; }
+  html,body{ margin:0; padding:0; }
+  body{
+    background:var(--bg);
+    color:var(--film);
+    font-family:var(--sans);
+    min-height:100vh;
+    -webkit-font-smoothing:antialiased;
+  }
+
+  .frame{
+    max-width:1180px;
+    margin:0 auto;
+    padding:28px 24px 60px;
+  }
+
+  header.top{
+    display:flex;
+    justify-content:space-between;
+    align-items:flex-end;
+    border-bottom:1px solid var(--line);
+    padding-bottom:18px;
+    margin-bottom:22px;
+    gap:24px;
+    flex-wrap:wrap;
+  }
+  header.top h1{
+    font-size:20px;
+    font-weight:600;
+    letter-spacing:0.2px;
+    margin:0 0 4px;
+  }
+  header.top p{
+    margin:0;
+    color:var(--film-dim);
+    font-size:13.5px;
+    max-width:46ch;
+    line-height:1.5;
+  }
+  .model-tag{
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--film-faint);
+    text-align:right;
+    line-height:1.6;
+  }
+  .model-tag span{ color:var(--teal); }
+
+  .weight-chip{
+    display:inline-block;
+    font-family:var(--mono);
+    font-size:11.5px;
+    padding:6px 12px;
+    border-radius:20px;
+    border:1px solid var(--line);
+    color:var(--film-faint);
+    margin-bottom:18px;
+  }
+  .weight-chip.trained{
+    border-color:var(--teal);
+    color:var(--teal);
+    background:rgba(79,163,160,0.08);
+  }
+
+  .about-panel{
+    border:1px solid var(--line);
+    border-radius:4px;
+    background:var(--panel);
+    margin-bottom:22px;
+  }
+  .about-panel summary{
+    cursor:pointer;
+    padding:13px 16px;
+    font-size:13.5px;
+    font-weight:500;
+    color:var(--film-dim);
+    list-style:none;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .about-panel summary::-webkit-details-marker{ display:none; }
+  .about-panel summary::before{
+    content:'+';
+    color:var(--film-faint);
+    font-size:15px;
+    width:14px;
+  }
+  .about-panel[open] summary::before{ content:'–'; }
+  .about-hint{
+    font-size:12px;
+    color:var(--film-faint);
+    font-weight:400;
+  }
+  .about-body{
+    padding:2px 16px 18px;
+    border-top:1px solid var(--line);
+    margin-top:2px;
+    padding-top:16px;
+  }
+  .about-stat{
+    display:flex;
+    flex-direction:column;
+    gap:8px;
+    margin-bottom:14px;
+    max-width:340px;
+  }
+  .about-stat-number{
+    font-size:32px;
+    font-weight:700;
+    color:var(--teal);
+    line-height:1;
+  }
+  .about-stat-number span{
+    font-size:14px;
+    font-weight:500;
+    color:var(--film-faint);
+    margin-left:4px;
+  }
+  .about-stat-caption{
+    font-size:13px;
+    color:var(--film-dim);
+  }
+  .about-bar-track{
+    height:8px;
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:3px;
+    overflow:hidden;
+  }
+  .about-bar-fill{
+    height:100%;
+    background:var(--teal);
+  }
+  .about-body p{
+    font-size:13.5px;
+    color:var(--film-dim);
+    line-height:1.6;
+    max-width:60ch;
+    margin:0 0 12px;
+  }
+  .about-tech{
+    font-family:var(--mono);
+    font-size:11px;
+    color:var(--film-faint);
+  }
+
+  .layout{
+    display:grid;
+    grid-template-columns:1.15fr 1fr;
+    gap:20px;
+  }
+  @media (max-width:860px){
+    .layout{ grid-template-columns:1fr; }
+  }
+
+  /* Lightbox */
+  .lightbox{
+    background:#05070a;
+    border:1px solid var(--line);
+    border-radius:4px;
+    aspect-ratio:4/4.5;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    overflow:hidden;
+    cursor:pointer;
+  }
+  .lightbox.has-image{ cursor:default; }
+  .lightbox canvas{
+    max-width:100%;
+    max-height:100%;
+    image-rendering:pixelated;
+  }
+  .lightbox img{
+    max-width:100%;
+    max-height:100%;
+    object-fit:contain;
+    filter:grayscale(0.15) contrast(1.02);
+  }
+  .canvas-stack{
+    position:relative;
+    display:inline-block;
+    max-width:100%;
+    max-height:100%;
+    line-height:0;
+  }
+  .canvas-stack canvas{
+    max-width:100%;
+    max-height:100%;
+    image-rendering:pixelated;
+  }
+  #overlayCanvas{
+    position:absolute;
+    top:0; left:0;
+    width:100%; height:100%;
+    pointer-events:none;
+    mix-blend-mode:screen;
+    opacity:0.85;
+    transition:opacity .25s ease;
+  }
+  #overlayCanvas.hidden-overlay{ opacity:0; }
+
+  .legend-row{
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-top:10px;
+    font-family:var(--mono);
+    font-size:10.5px;
+    color:var(--film-faint);
+  }
+  .legend-bar{
+    flex:1;
+    height:6px;
+    border-radius:2px;
+    background:linear-gradient(90deg, #0d3b3a, #4fa3a0, #e2a23c, #f2d9a8);
+  }
+
+  .heatmap-modes{
+    display:flex;
+    gap:6px;
+    margin-top:10px;
+  }
+  .mode-btn{
+    flex:1;
+    font-family:var(--sans);
+    font-size:12px;
+    font-weight:500;
+    padding:7px 8px;
+    border-radius:3px;
+    border:1px solid var(--line);
+    background:var(--panel-2);
+    color:var(--film-dim);
+    cursor:pointer;
+  }
+  .mode-btn:hover{ border-color:var(--film-faint); }
+  .mode-btn.active{
+    border-color:var(--teal);
+    color:var(--teal);
+    background:rgba(79,163,160,0.1);
+  }
+  .drop-hint{
+    text-align:center;
+    color:var(--film-faint);
+    padding:32px;
+  }
+  .drop-hint .icon{
+    width:40px; height:40px;
+    margin:0 auto 14px;
+    border:1px solid var(--film-faint);
+    border-radius:50%;
+    display:flex; align-items:center; justify-content:center;
+    font-size:18px;
+  }
+  .drop-hint .lead{
+    font-size:14px; color:var(--film-dim); margin-bottom:6px;
+  }
+  .drop-hint .sub{
+    font-size:12px; font-family:var(--mono);
+  }
+  .lightbox.drag-over{
+    border-color:var(--teal);
+    box-shadow: inset 0 0 0 1px var(--teal);
+  }
+  .frame-corners{
+    position:absolute; inset:10px; pointer-events:none;
+  }
+  .frame-corners::before, .frame-corners::after,
+  .fc-b1, .fc-b2{
+    content:''; position:absolute; width:14px; height:14px;
+    border-color:var(--film-faint);
+  }
+  .frame-corners::before{ top:0; left:0; border-top:1px solid; border-left:1px solid; }
+  .frame-corners::after{ top:0; right:0; border-top:1px solid; border-right:1px solid; }
+  .fc-b1{ bottom:0; left:0; border-bottom:1px solid; border-left:1px solid; }
+  .fc-b2{ bottom:0; right:0; border-bottom:1px solid; border-right:1px solid; }
+
+  .scan-strip{
+    position:absolute; left:0; right:0; height:2px;
+    background:linear-gradient(90deg, transparent, var(--teal), transparent);
+    opacity:0; top:0;
+  }
+  .scan-strip.active{
+    animation: scan 1.6s linear infinite;
+    opacity:0.85;
+  }
+  @keyframes scan{
+    0%{ top:4%; }
+    100%{ top:94%; }
+  }
+
+  input[type=file]{ display:none; }
+
+  /* Right panel */
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--line);
+    border-radius:4px;
+    padding:20px 22px 22px;
+    display:flex;
+    flex-direction:column;
+    gap:18px;
+  }
+
+  .field-label{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:0.03em;
+    color:var(--film-faint);
+    margin-bottom:8px;
+  }
+
+  .controls{ display:flex; gap:10px; flex-wrap:wrap; }
+  button{
+    font-family:var(--sans);
+    font-size:13.5px;
+    font-weight:500;
+    padding:10px 16px;
+    border-radius:3px;
+    border:1px solid var(--line);
+    background:var(--panel-2);
+    color:var(--film);
+    cursor:pointer;
+    transition:border-color .15s ease, background .15s ease;
+  }
+  button:hover{ border-color:var(--film-faint); }
+  button.primary{
+    background:var(--amber);
+    color:#1a1305;
+    border-color:var(--amber);
+    font-weight:600;
+  }
+  button.primary:hover{ background:#eab157; }
+  button:disabled{
+    opacity:0.35;
+    cursor:not-allowed;
+  }
+  button.ghost{ background:transparent; }
+
+  .status-line{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--film-faint);
+    min-height:16px;
+  }
+  .status-line.error{ color:var(--red); }
+  .status-line.ok{ color:var(--teal); }
+
+  .divider{ height:1px; background:var(--line); }
+
+  /* Verdict */
+  .verdict-block{
+    display:none;
+  }
+  .verdict-block.show{ display:block; }
+
+  .verdict-head{
+    display:flex; align-items:center; gap:10px; margin-bottom:14px;
+  }
+  .verdict-light{
+    width:10px; height:10px; border-radius:50%;
+    background:var(--film-faint);
+    box-shadow:0 0 8px 1px transparent;
+  }
+  .verdict-light.pneumonia{ background:var(--red); box-shadow:0 0 10px 1px rgba(192,86,63,0.6); }
+  .verdict-light.normal{ background:var(--teal); box-shadow:0 0 10px 1px rgba(79,163,160,0.6); }
+
+  .verdict-title{ font-size:19px; font-weight:600; letter-spacing:0.2px; }
+  .verdict-title.pneumonia{ color:#e0846d; }
+  .verdict-title.normal{ color:#7fc4c1; }
+
+  .verdict-sub{
+    font-family:var(--mono);
+    font-size:12px;
+    color:var(--film-faint);
+    margin-top:2px;
+  }
+
+  .prob-row{ margin-bottom:12px; }
+  .prob-row:last-child{ margin-bottom:0; }
+  .prob-label-line{
+    display:flex; justify-content:space-between;
+    font-size:12.5px; margin-bottom:5px;
+  }
+  .prob-label-line .name{ color:var(--film-dim); }
+  .prob-label-line .val{ font-family:var(--mono); color:var(--film); }
+  .prob-track{
+    height:6px; background:var(--panel-2); border:1px solid var(--line);
+    border-radius:2px; overflow:hidden;
+  }
+  .prob-fill{ height:100%; width:0%; transition:width .6s cubic-bezier(.2,.8,.3,1); }
+  .prob-fill.normal-fill{ background:var(--teal); }
+  .prob-fill.pneumonia-fill{ background:var(--red); }
+
+  .note-box{
+    background:var(--panel-2);
+    border:1px solid var(--line);
+    border-radius:3px;
+    padding:12px 14px;
+    font-size:12.5px;
+    color:var(--film-dim);
+    line-height:1.55;
+    margin-top:16px;
+  }
+
+  footer{
+    margin-top:26px;
+    font-size:11.5px;
+    color:var(--film-faint);
+    font-family:var(--mono);
+    text-align:center;
+  }
+</style>
+</head>
+<body>
+
+<div class="frame">
+
+  <header class="top">
+    <div>
+      <h1>Chest X-ray Screening Demo</h1>
+      <p>Upload a chest X-ray, see what the AI decides, and see roughly which parts of the image drove that decision. Runs entirely in your browser — nothing is uploaded anywhere.</p>
+    </div>
+  </header>
+
+  <div class="weight-chip trained" id="weightChip">Model ready</div>
+
+  <details class="about-panel" id="aboutPanel">
+    <summary>How good is this, really? <span class="about-hint">(plain-language explanation)</span></summary>
+    <div class="about-body">
+      <div class="about-stat">
+        <div class="about-stat-number">≈ 88 <span>out of 100</span></div>
+        <div class="about-stat-caption">correct guesses on X-rays it had never seen before</div>
+        <div class="about-bar-track"><div class="about-bar-fill" style="width:88%;"></div></div>
+      </div>
+      <p>
+        It's noticeably better at spotting pneumonia when it's really there than at correctly clearing a healthy scan — so treat a "normal" result with a bit more skepticism than a "pneumonia" one.
+        This is a machine-learning demo built for learning purposes, not a substitute for a radiologist.
+      </p>
+      <div class="about-tech">EfficientNetB0 (transfer learning) · 224×224 input · trained on ~5,800 labeled chest X-rays · <span id="backend-tag">backend: —</span></div>
+    </div>
+  </details>
+
+  <div class="layout">
+
+    <!-- Image / lightbox -->
+    <div>
+      <div class="lightbox" id="lightbox">
+        <div class="scan-strip" id="scanStrip"></div>
+        <div class="frame-corners"><span class="fc-b1"></span><span class="fc-b2"></span></div>
+        <div class="drop-hint" id="dropHint">
+          <div class="icon">↑</div>
+          <div class="lead">Drop a chest X-ray here</div>
+          <div class="sub">or click to browse · JPG / PNG</div>
+        </div>
+        <div class="canvas-stack" id="canvasStack" style="display:none;">
+          <canvas id="previewCanvas"></canvas>
+          <canvas id="overlayCanvas"></canvas>
+        </div>
+      </div>
+      <input type="file" id="fileInput" accept="image/png, image/jpeg">
+
+      <div class="heatmap-modes" id="heatmapModes" style="display:none;">
+        <button class="mode-btn" data-mode="off">Off</button>
+        <button class="mode-btn active" data-mode="saliency">Saliency</button>
+        <button class="mode-btn" data-mode="gradcam">Grad-CAM style</button>
+      </div>
+
+      <div class="legend-row" id="legendRow" style="display:none;">
+        <span class="legend-label">Low attention</span>
+        <span class="legend-bar"></span>
+        <span class="legend-label">High attention</span>
+      </div>
+    </div>
+
+    <!-- Controls & results -->
+    <div class="panel">
+
+      <div>
+        <div class="field-label">IMAGE SOURCE</div>
+        <div class="controls">
+          <button class="ghost" id="browseBtn">Choose file</button>
+          <button class="primary" id="analyzeBtn" disabled>Run screening</button>
+          <button class="ghost" id="resetBtn" disabled>Clear</button>
+        </div>
+        <div class="status-line" id="statusLine">Waiting for an image.</div>
+      </div>
+
+      <div class="divider"></div>
+
+      <div class="verdict-block" id="verdictBlock">
+        <div class="verdict-head">
+          <div class="verdict-light" id="verdictLight"></div>
+          <div>
+            <div class="verdict-title" id="verdictTitle">—</div>
+            <div class="verdict-sub" id="verdictSub">—</div>
+          </div>
+        </div>
+
+        <div class="prob-row">
+          <div class="prob-label-line"><span class="name">Normal</span><span class="val" id="normalVal">0.0%</span></div>
+          <div class="prob-track"><div class="prob-fill normal-fill" id="normalFill"></div></div>
+        </div>
+        <div class="prob-row">
+          <div class="prob-label-line"><span class="name">Pneumonia</span><span class="val" id="pneumoniaVal">0.0%</span></div>
+          <div class="prob-track"><div class="prob-fill pneumonia-fill" id="pneumoniaFill"></div></div>
+        </div>
+
+        <div class="note-box">
+          <strong style="color:var(--film);">How to read this:</strong> confidence is the raw softmax output for this one image — it's a demo of the model's behavior, not a calibrated or clinically meaningful probability.
+        </div>
+
+        <div class="note-box" id="saliencyNote" style="display:none;"></div>
+      </div>
+
+    </div>
+  </div>
+
+  <footer>CLIENT-SIDE INFERENCE · TENSORFLOW.JS · NO IMAGE LEAVES THE BROWSER · EDUCATIONAL CNN DEMO, NOT FOR MEDICAL USE</footer>
+</div>
+
+<script>
+(function(){
+  const IMG_SIZE = 224;
+  const CLASS_NAMES = ["NORMAL", "PNEUMONIA"];
+  const MODEL_URL = "./model/model.json";
+
+  const lightbox = document.getElementById('lightbox');
+  const dropHint = document.getElementById('dropHint');
+  const canvasStack = document.getElementById('canvasStack');
+  const previewCanvas = document.getElementById('previewCanvas');
+  const overlayCanvas = document.getElementById('overlayCanvas');
+  const legendRow = document.getElementById('legendRow');
+  const saliencyNote = document.getElementById('saliencyNote');
+  const heatmapModes = document.getElementById('heatmapModes');
+  const modeButtons = Array.from(document.querySelectorAll('.mode-btn'));
+  const fileInput = document.getElementById('fileInput');
+  const browseBtn = document.getElementById('browseBtn');
+  const analyzeBtn = document.getElementById('analyzeBtn');
+  const resetBtn = document.getElementById('resetBtn');
+  const statusLine = document.getElementById('statusLine');
+  const scanStrip = document.getElementById('scanStrip');
+  const backendTag = document.getElementById('backend-tag');
+
+  const verdictBlock = document.getElementById('verdictBlock');
+  const verdictLight = document.getElementById('verdictLight');
+  const verdictTitle = document.getElementById('verdictTitle');
+  const verdictSub = document.getElementById('verdictSub');
+  const normalVal = document.getElementById('normalVal');
+  const pneumoniaVal = document.getElementById('pneumoniaVal');
+  const normalFill = document.getElementById('normalFill');
+  const pneumoniaFill = document.getElementById('pneumoniaFill');
+
+  let model = null;
+  let modelReady = false;
+  let currentImageEl = null;
+  let saliencyMaps = null;
+  let heatmapMode = 'saliency';
+  const weightChip = document.getElementById('weightChip');
+
+  const MODE_NOTES = {
+    saliency: 'This is a saliency map: it shows which individual pixels the network is most sensitive to. Bright spots are pixels that would shift the verdict most if changed.',
+    gradcam: 'This is a Grad-CAM-style view: a coarser, region-level version of the same idea, closer to how the original Grad-CAM technique highlights broad areas rather than single pixels. Built the same way as the saliency map above — this is a simplified approximation for illustration, not the exact original Grad-CAM algorithm.'
+  };
+
+  function setStatus(msg, kind){
+    statusLine.textContent = msg;
+    statusLine.className = 'status-line' + (kind ? ' ' + kind : '');
+  }
+
+  function buildLocalModel(){
+    const input = tf.input({ shape: [IMG_SIZE, IMG_SIZE, 3] });
+    let x = input;
+    const filters = [32, 64, 128, 256, 1280];
+    filters.forEach((f, i) => {
+      x = tf.layers.conv2d({ filters: f, kernelSize: 3, strides: 2, padding: 'same', name: 'conv_' + i }).apply(x);
+      x = tf.layers.batchNormalization({ name: 'bn_' + i }).apply(x);
+      x = tf.layers.activation({ activation: 'relu', name: 'act_' + i }).apply(x);
+    });
+    const gap = tf.layers.globalAveragePooling2d({ name: 'global_average_pooling' }).apply(x);
+    const dense256 = tf.layers.dense({ units: 256, activation: 'relu', name: 'dense_256' }).apply(gap);
+    const dropout = tf.layers.dropout({ rate: 0.4, name: 'dropout' }).apply(dense256);
+    const output = tf.layers.dense({ units: 2, activation: 'softmax', name: 'output' }).apply(dropout);
+    return tf.model({ inputs: input, outputs: output, name: 'screening_model' });
+  }
+
+  async function loadModel(){
+    try {
+      await tf.ready();
+      backendTag.innerHTML = 'backend: <span>' + tf.getBackend() + '</span>';
+    } catch(e) {}
+
+    try {
+      model = await tf.loadLayersModel(MODEL_URL);
+    } catch(err) {
+      model = buildLocalModel();
+    }
+    
+    modelReady = true;
+    weightChip.textContent = 'Model loaded';
+    weightChip.className = 'weight-chip trained';
+    setStatus('Model loaded. Upload an X-ray to begin.', 'ok');
+    updateAnalyzeState();
+  }
+
+  function updateAnalyzeState(){
+    analyzeBtn.disabled = !(modelReady && currentImageEl);
+  }
+
+  function handleFile(file){
+    if (!file || !file.type.match(/^image\/(png|jpeg)$/)) {
+      setStatus('Please choose a PNG or JPG image.', 'error');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const img = new Image();
+      img.onload = () => {
+        currentImageEl = img;
+        drawPreview(img);
+        dropHint.style.display = 'none';
+        lightbox.classList.add('has-image');
+        resetBtn.disabled = false;
+        verdictBlock.classList.remove('show');
+        saliencyNote.style.display = 'none';
+        legendRow.style.display = 'none';
+        heatmapModes.style.display = 'none';
+        saliencyMaps = null;
+        clearOverlay();
+        updateAnalyzeState();
+        setStatus('Image loaded. Ready to run screening.', 'ok');
+      };
+      img.src = e.target.result;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  function drawPreview(img){
+    const maxDim = 560;
+    let w = img.naturalWidth, h = img.naturalHeight;
+    const scale = Math.min(maxDim / w, maxDim / h, 1);
+    w = Math.round(w * scale); h = Math.round(h * scale);
+    previewCanvas.width = w;
+    previewCanvas.height = h;
+    overlayCanvas.width = w;
+    overlayCanvas.height = h;
+    const ctx = previewCanvas.getContext('2d');
+    ctx.filter = 'grayscale(15%) contrast(1.02)';
+    ctx.drawImage(img, 0, 0, w, h);
+    canvasStack.style.display = 'inline-block';
+  }
+
+  function clearOverlay(){
+    const ctx = overlayCanvas.getContext('2d');
+    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    overlayCanvas.classList.add('hidden-overlay');
+  }
+
+  const COLOR_STOPS = [
+    { p: 0.0,  c: [13, 59, 58] },
+    { p: 0.35, c: [79, 163, 160] },
+    { p: 0.65, c: [226, 162, 60] },
+    { p: 1.0,  c: [242, 217, 168] }
+  ];
+  function heatColor(v){
+    v = Math.min(1, Math.max(0, v));
+    let a = COLOR_STOPS[0], b = COLOR_STOPS[COLOR_STOPS.length - 1];
+    for (let i = 0; i < COLOR_STOPS.length - 1; i++){
+      if (v >= COLOR_STOPS[i].p && v <= COLOR_STOPS[i+1].p){
+        a = COLOR_STOPS[i]; b = COLOR_STOPS[i+1]; break;
+      }
+    }
+    const span = (b.p - a.p) || 1;
+    const t = (v - a.p) / span;
+    const r = a.c[0] + (b.c[0] - a.c[0]) * t;
+    const g = a.c[1] + (b.c[1] - a.c[1]) * t;
+    const bl = a.c[2] + (b.c[2] - a.c[2]) * t;
+    const alpha = Math.pow(v, 1.4);
+    return [r, g, bl, alpha];
+  }
+
+  async function computeSaliency(inputTensor, classIndex){
+    const gradFn = (x) => model.predict(x).slice([0, classIndex], [1, 1]).sum();
+    const gradTensor = tf.grad(gradFn)(inputTensor);
+    const mapTensor = tf.tidy(() => {
+      let m = gradTensor.abs().max(-1).squeeze();
+      const maxVal = m.max();
+      m = m.div(maxVal.add(1e-8));
+      return m;
+    });
+    const data = await mapTensor.data();
+    const shape = mapTensor.shape;
+    gradTensor.dispose();
+    mapTensor.dispose();
+    return { data, height: shape[0], width: shape[1] };
+  }
+
+  function drawSaliencyOverlay(saliency){
+    const { data, width, height } = saliency;
+    const small = document.createElement('canvas');
+    small.width = width; small.height = height;
+    const sctx = small.getContext('2d');
+    const imgData = sctx.createImageData(width, height);
+    for (let i = 0; i < width * height; i++){
+      const [r, g, b, a] = heatColor(data[i]);
+      imgData.data[i*4] = r;
+      imgData.data[i*4+1] = g;
+      imgData.data[i*4+2] = b;
+      imgData.data[i*4+3] = Math.round(a * 255);
+    }
+    sctx.putImageData(imgData, 0, 0);
+
+    const ctx = overlayCanvas.getContext('2d');
+    ctx.clearRect(0, 0, overlayCanvas.width, overlayCanvas.height);
+    ctx.imageSmoothingEnabled = true;
+    ctx.drawImage(small, 0, 0, overlayCanvas.width, overlayCanvas.height);
+    overlayCanvas.classList.remove('hidden-overlay');
+  }
+
+  function poolToGrid(fine, gridSize){
+    const { data, width, height } = fine;
+    const cellW = width / gridSize, cellH = height / gridSize;
+    const pooled = new Float32Array(gridSize * gridSize);
+    for (let gy = 0; gy < gridSize; gy++){
+      for (let gx = 0; gx < gridSize; gx++){
+        let sum = 0, count = 0;
+        const x0 = Math.floor(gx * cellW), x1 = Math.floor((gx + 1) * cellW);
+        const y0 = Math.floor(gy * cellH), y1 = Math.floor((gy + 1) * cellH);
+        for (let y = y0; y < y1; y++){
+          for (let x = x0; x < x1; x++){
+            sum += data[y * width + x];
+            count++;
+          }
+        }
+        pooled[gy * gridSize + gx] = count ? sum / count : 0;
+      }
+    }
+    let max = 0;
+    for (let i = 0; i < pooled.length; i++) max = Math.max(max, pooled[i]);
+    if (max > 0) for (let i = 0; i < pooled.length; i++) pooled[i] /= max;
+    return { data: pooled, width: gridSize, height: gridSize };
+  }
+
+  function renderHeatmapMode(){
+    if (!saliencyMaps) return;
+    if (heatmapMode === 'off'){
+      clearOverlay();
+    } else {
+      drawSaliencyOverlay(saliencyMaps[heatmapMode]);
+    }
+    saliencyNote.style.display = heatmapMode === 'off' ? 'none' : 'block';
+    saliencyNote.innerHTML = heatmapMode === 'off' ? '' :
+      '<strong style="color:var(--film);">What am I looking at?</strong> ' + MODE_NOTES[heatmapMode];
+    legendRow.style.display = heatmapMode === 'off' ? 'none' : 'flex';
+  }
+
+  modeButtons.forEach(btn => {
+    btn.addEventListener('click', () => {
+      heatmapMode = btn.dataset.mode;
+      modeButtons.forEach(b => b.classList.toggle('active', b === btn));
+      renderHeatmapMode();
+    });
+  });
+
+  async function runInference(){
+    if (!model || !currentImageEl) return;
+    analyzeBtn.disabled = true;
+    scanStrip.classList.add('active');
+    setStatus('Running inference…', null);
+
+    await new Promise(r => setTimeout(r, 30));
+
+    let inputTensor = null;
+    try {
+      inputTensor = tf.tidy(() => {
+        let t = tf.browser.fromPixels(currentImageEl, 3);
+        t = tf.image.resizeBilinear(t, [IMG_SIZE, IMG_SIZE]);
+        return t.toFloat().expandDims(0);
+      });
+      const result = model.predict(inputTensor);
+      const probs = await result.data();
+      result.dispose();
+
+      const normalP = probs[0];
+      const pneumoniaP = probs[1];
+      const predIndex = pneumoniaP >= normalP ? 1 : 0;
+      renderVerdict(normalP, pneumoniaP);
+      setStatus('Screening complete. Computing attention maps…', 'ok');
+
+      try {
+        const fineSaliency = await computeSaliency(inputTensor, predIndex);
+        const gradcamStyle = poolToGrid(fineSaliency, 7);
+        saliencyMaps = { saliency: fineSaliency, gradcam: gradcamStyle };
+        heatmapMode = 'saliency';
+        modeButtons.forEach(b => b.classList.toggle('active', b.dataset.mode === 'saliency'));
+        heatmapModes.style.display = 'flex';
+        renderHeatmapMode();
+        setStatus('Screening complete.', 'ok');
+      } catch (salErr) {
+        console.error(salErr);
+        setStatus('Screening complete (attention map unavailable for this model).', 'ok');
+      }
+    } catch (err) {
+      console.error(err);
+      setStatus('Inference failed: ' + err.message, 'error');
+    } finally {
+      if (inputTensor) inputTensor.dispose();
+      scanStrip.classList.remove('active');
+      updateAnalyzeState();
+    }
+  }
+
+  function renderVerdict(normalP, pneumoniaP){
+    verdictBlock.classList.add('show');
+    const isPneumonia = pneumoniaP >= normalP;
+    const confidence = (Math.max(normalP, pneumoniaP) * 100).toFixed(1);
+
+    verdictLight.className = 'verdict-light ' + (isPneumonia ? 'pneumonia' : 'normal');
+    verdictTitle.className = 'verdict-title ' + (isPneumonia ? 'pneumonia' : 'normal');
+    verdictTitle.textContent = isPneumonia ? 'Pneumonia pattern detected' : 'No pneumonia pattern detected';
+    verdictSub.textContent = 'Model confidence: ' + confidence + '%';
+
+    normalVal.textContent = (normalP * 100).toFixed(1) + '%';
+    pneumoniaVal.textContent = (pneumoniaP * 100).toFixed(1) + '%';
+    requestAnimationFrame(() => {
+      normalFill.style.width = (normalP * 100).toFixed(1) + '%';
+      pneumoniaFill.style.width = (pneumoniaP * 100).toFixed(1) + '%';
+    });
+  }
+
+  function resetAll(){
+    currentImageEl = null;
+    canvasStack.style.display = 'none';
+    dropHint.style.display = 'block';
+    lightbox.classList.remove('has-image');
+    verdictBlock.classList.remove('show');
+    legendRow.style.display = 'none';
+    saliencyNote.style.display = 'none';
+    heatmapModes.style.display = 'none';
+    saliencyMaps = null;
+    clearOverlay();
+    resetBtn.disabled = true;
+    fileInput.value = '';
+    updateAnalyzeState();
+    setStatus('Ready — upload an X-ray to begin.', 'ok');
+  }
+
+  browseBtn.addEventListener('click', () => fileInput.click());
+  lightbox.addEventListener('click', () => { if (!currentImageEl) fileInput.click(); });
+  fileInput.addEventListener('change', (e) => handleFile(e.target.files[0]));
+  analyzeBtn.addEventListener('click', runInference);
+  resetBtn.addEventListener('click', resetAll);
+
+  ['dragenter','dragover'].forEach(evt => {
+    lightbox.addEventListener(evt, (e) => { e.preventDefault(); lightbox.classList.add('drag-over'); });
+  });
+  ['dragleave','drop'].forEach(evt => {
+    lightbox.addEventListener(evt, (e) => { e.preventDefault(); lightbox.classList.remove('drag-over'); });
+  });
+  lightbox.addEventListener('drop', (e) => {
+    const file = e.dataTransfer.files[0];
+    if (file) handleFile(file);
+  });
+
+  loadModel();
+})();
+</script>
+
+</body>
+</html>
