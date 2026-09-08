@@ -1,0 +1,1896 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>D.K — Neural Gesture Interface</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Rajdhani:wght@300;400;500;600;700&family=Oxanium:wght@200;300;400;600;800&display=swap"
+        rel="stylesheet">
+    <style>
+        *,
+        *::before,
+        *::after {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0
+        }
+
+        :root {
+            --bg: #00020a;
+            --holo: #00c8ff;
+            --holo2: #0080c8;
+            --holo3: #5de0ff;
+            --accent: #00ffd0;
+            --gold: #e8c840;
+            --warn: #ff7040;
+            --dim: rgba(0, 200, 255, .25);
+            --dimmer: rgba(0, 200, 255, .09);
+            --surface: rgba(0, 200, 255, .04);
+            --text: rgba(210, 240, 255, .92);
+            --textdim: rgba(100, 180, 210, .4);
+            --mono: 'Share Tech Mono', monospace;
+            --sans: 'Rajdhani', sans-serif;
+            --display: 'Oxanium', sans-serif;
+        }
+
+        html,
+        body {
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+            background: var(--bg);
+            color: var(--text);
+            font-family: var(--mono);
+            cursor: none
+        }
+
+        /* ══ CUSTOM CURSOR ══ */
+        #cur {
+            position: fixed;
+            z-index: 9999;
+            pointer-events: none;
+            will-change: transform
+        }
+
+        #cur-diamond {
+            position: absolute;
+            width: 22px;
+            height: 22px;
+            border: 1px solid var(--holo);
+            transform: translate(-50%, -50%) rotate(45deg);
+            box-shadow: 0 0 6px rgba(0, 200, 255, .4);
+            transition: width .15s, height .15s, box-shadow .15s;
+        }
+
+        #cur-dot {
+            position: absolute;
+            width: 3px;
+            height: 3px;
+            background: var(--accent);
+            border-radius: 50%;
+            transform: translate(-50%, -50%);
+            box-shadow: 0 0 8px var(--accent)
+        }
+
+        #cur-h {
+            position: absolute;
+            height: 1px;
+            width: 14px;
+            background: var(--holo);
+            opacity: .35;
+            transform: translate(-50%, -50%)
+        }
+
+        #cur-v {
+            position: absolute;
+            width: 1px;
+            height: 14px;
+            background: var(--holo);
+            opacity: .35;
+            transform: translate(-50%, -50%)
+        }
+
+        #cur.g-fist #cur-diamond {
+            width: 38px;
+            height: 38px;
+            border-color: var(--warn);
+            box-shadow: 0 0 16px rgba(255, 112, 64, .6)
+        }
+
+        #cur.g-open #cur-diamond {
+            width: 32px;
+            height: 32px;
+            border-color: var(--accent);
+            box-shadow: 0 0 12px rgba(0, 255, 208, .5)
+        }
+
+        #cur.g-beam #cur-diamond {
+            width: 16px;
+            height: 16px;
+            border-color: var(--gold);
+            box-shadow: 0 0 10px rgba(232, 200, 64, .6)
+        }
+
+        #cur.g-vortex #cur-diamond {
+            width: 28px;
+            height: 28px;
+            border-color: #b060ff;
+            box-shadow: 0 0 14px rgba(176, 96, 255, .6);
+            animation: spinDiamond .6s linear infinite
+        }
+
+        @keyframes spinDiamond {
+            to {
+                transform: translate(-50%, -50%) rotate(225deg)
+            }
+        }
+
+        /* ══ BOOT ══ */
+        #boot {
+            position: fixed;
+            inset: 0;
+            z-index: 900;
+            background: var(--bg);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: opacity 1.2s
+        }
+
+        #boot.exit {
+            opacity: 0;
+            pointer-events: none
+        }
+
+        .b-eyebrow {
+            font-family: var(--display);
+            font-weight: 200;
+            font-size: 10px;
+            letter-spacing: 12px;
+            color: var(--textdim);
+            text-transform: uppercase;
+            animation: riseIn .7s .2s both
+        }
+
+        .b-logo-wrap {
+            position: relative;
+            margin: 18px 0 6px;
+            animation: riseIn .9s .5s both
+        }
+
+        .b-logo {
+            font-family: var(--display);
+            font-weight: 800;
+            font-size: clamp(80px, 14vw, 160px);
+            letter-spacing: 20px;
+            color: transparent;
+            -webkit-text-stroke: 1.5px var(--holo);
+            filter: drop-shadow(0 0 30px rgba(0, 200, 255, .35)) drop-shadow(0 0 80px rgba(0, 200, 255, .12));
+        }
+
+        .b-logo-scan {
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(180deg, transparent 0%, rgba(0, 200, 255, .12) 48%, rgba(0, 200, 255, .22) 50%, rgba(0, 200, 255, .12) 52%, transparent 100%);
+            animation: scanPass 2.4s 1.4s both;
+        }
+
+        @keyframes scanPass {
+            0% {
+                transform: translateY(-100%);
+                opacity: 0
+            }
+
+            20% {
+                opacity: 1
+            }
+
+            80% {
+                opacity: 1
+            }
+
+            100% {
+                transform: translateY(100%);
+                opacity: 0
+            }
+        }
+
+        .b-tagline {
+            font-family: var(--display);
+            font-weight: 200;
+            font-size: 11px;
+            letter-spacing: 8px;
+            color: var(--textdim);
+            animation: riseIn .7s .9s both
+        }
+
+        .b-divider {
+            width: 400px;
+            height: 1px;
+            background: linear-gradient(90deg, transparent, var(--dim), transparent);
+            margin: 36px 0 28px;
+            animation: riseIn .5s 1.3s both
+        }
+
+        .b-log {
+            width: 400px;
+            display: flex;
+            flex-direction: column;
+            gap: 7px;
+            animation: riseIn .5s 1.5s both
+        }
+
+        .b-log-row {
+            display: flex;
+            gap: 14px;
+            font-size: 9px;
+            letter-spacing: 1.5px
+        }
+
+        .b-log-row .btag {
+            color: var(--accent);
+            min-width: 40px
+        }
+
+        .b-log-row .bval {
+            color: var(--holo3)
+        }
+
+        .b-log-row .bstat {
+            margin-left: auto;
+            color: rgba(0, 255, 208, .5)
+        }
+
+        .b-bar-wrap {
+            width: 400px;
+            margin-top: 28px;
+            animation: riseIn .5s 1.8s both
+        }
+
+        .b-bar-label {
+            display: flex;
+            justify-content: space-between;
+            font-size: 8px;
+            letter-spacing: 2px;
+            color: var(--textdim);
+            margin-bottom: 6px
+        }
+
+        .b-bar {
+            height: 1px;
+            background: rgba(0, 200, 255, .1);
+            overflow: hidden;
+            position: relative
+        }
+
+        .b-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, var(--holo2), var(--holo), var(--accent));
+            animation: barFill 2.2s 2s forwards;
+            width: 0;
+            box-shadow: 0 0 6px var(--accent)
+        }
+
+        @keyframes barFill {
+            to {
+                width: 100%
+            }
+        }
+
+        .b-btn {
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 11px;
+            letter-spacing: 8px;
+            padding: 13px 44px;
+            border: 1px solid rgba(0, 200, 255, .5);
+            background: transparent;
+            color: var(--holo);
+            cursor: pointer;
+            margin-top: 28px;
+            position: relative;
+            overflow: hidden;
+            text-transform: uppercase;
+            animation: riseIn .5s 4.2s both;
+            transition: border-color .3s, color .3s, box-shadow .3s;
+        }
+
+        .b-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: var(--holo);
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform .35s
+        }
+
+        .b-btn:hover::before {
+            transform: scaleX(1)
+        }
+
+        .b-btn:hover {
+            color: var(--bg);
+            border-color: var(--holo);
+            box-shadow: 0 0 24px rgba(0, 200, 255, .5)
+        }
+
+        .b-btn span {
+            position: relative;
+            z-index: 1
+        }
+
+        @keyframes riseIn {
+            from {
+                opacity: 0;
+                transform: translateY(16px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        /* ══ APP GRID ══ */
+        #app {
+            position: fixed;
+            inset: 0;
+            z-index: 10;
+            pointer-events: none;
+            display: grid;
+            grid-template:
+                "tl tm tr" 56px
+                "ll mc rr" 1fr
+                "bl bm br" 58px
+                / 268px 1fr 268px;
+        }
+
+        /* ══ BORDERS ══ */
+        .tl {
+            grid-area: tl;
+            border-right: 1px solid var(--dimmer);
+            border-bottom: 1px solid var(--dimmer);
+            display: flex;
+            align-items: center;
+            padding: 0 18px;
+            gap: 14px
+        }
+
+        .tm {
+            grid-area: tm;
+            border-bottom: 1px solid var(--dimmer);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            gap: 28px
+        }
+
+        .tr {
+            grid-area: tr;
+            border-left: 1px solid var(--dimmer);
+            border-bottom: 1px solid var(--dimmer);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 0 18px;
+            gap: 10px
+        }
+
+        .ll {
+            grid-area: ll;
+            border-right: 1px solid var(--dimmer);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden
+        }
+
+        .mc {
+            grid-area: mc;
+            position: relative
+        }
+
+        .rr {
+            grid-area: rr;
+            border-left: 1px solid var(--dimmer);
+            display: flex;
+            flex-direction: column;
+            overflow: hidden;
+            padding: 0 0 0 0
+        }
+
+        .bl {
+            grid-area: bl;
+            border-right: 1px solid var(--dimmer);
+            border-top: 1px solid var(--dimmer);
+            display: flex;
+            align-items: center;
+            padding: 0 18px;
+            gap: 20px
+        }
+
+        .bm {
+            grid-area: bm;
+            border-top: 1px solid var(--dimmer);
+            display: flex;
+            align-items: center;
+            overflow: hidden
+        }
+
+        .br {
+            grid-area: br;
+            border-left: 1px solid var(--dimmer);
+            border-top: 1px solid var(--dimmer);
+            display: flex;
+            align-items: center;
+            justify-content: flex-end;
+            padding: 0 18px;
+            gap: 18px
+        }
+
+        /* corner accents */
+        .tl::before,
+        .tr::after {
+            content: '';
+            position: absolute;
+            width: 6px;
+            height: 6px;
+            border-color: var(--holo);
+            border-style: solid;
+        }
+
+        .tl::before {
+            top: 10px;
+            left: 10px;
+            border-width: 1px 0 0 1px
+        }
+
+        .tr::after {
+            top: 10px;
+            right: 10px;
+            border-width: 1px 1px 0 0
+        }
+
+        /* ══ TOP BAR ══ */
+        .sys-dot {
+            width: 5px;
+            height: 5px;
+            border-radius: 50%;
+            background: var(--accent);
+            box-shadow: 0 0 7px var(--accent);
+            animation: dotPulse 2.2s ease-in-out infinite
+        }
+
+        @keyframes dotPulse {
+
+            0%,
+            100% {
+                opacity: 1
+            }
+
+            50% {
+                opacity: .25
+            }
+        }
+
+        .sys-name {
+            font-family: var(--display);
+            font-weight: 800;
+            font-size: 18px;
+            letter-spacing: 6px;
+            color: var(--holo);
+            text-shadow: 0 0 14px rgba(0, 200, 255, .5)
+        }
+
+        .sys-sub {
+            font-size: 8px;
+            letter-spacing: 3px;
+            color: var(--textdim);
+            margin-top: 1px
+        }
+
+        .hud-metric {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            gap: 2px
+        }
+
+        .hud-metric .ml {
+            font-size: 7px;
+            letter-spacing: 3px;
+            color: var(--textdim);
+            text-transform: uppercase
+        }
+
+        .hud-metric .mv {
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 20px;
+            color: var(--holo3);
+            letter-spacing: 1px;
+            line-height: 1
+        }
+
+        .hud-metric .mv.accent {
+            color: var(--accent)
+        }
+
+        .badge {
+            font-size: 8px;
+            letter-spacing: 3px;
+            padding: 4px 10px;
+            border: 1px solid;
+            text-transform: uppercase;
+            font-family: var(--mono)
+        }
+
+        .badge-on {
+            border-color: var(--accent);
+            color: var(--accent);
+            box-shadow: 0 0 8px rgba(0, 255, 208, .15)
+        }
+
+        .badge-mode {
+            border-color: var(--holo);
+            color: var(--holo);
+            box-shadow: 0 0 6px rgba(0, 200, 255, .12)
+        }
+
+        /* ══ LEFT PANEL ══ */
+        .panel-title {
+            font-size: 7px;
+            letter-spacing: 4px;
+            color: var(--textdim);
+            text-transform: uppercase;
+            padding: 14px 18px 10px;
+            border-bottom: 1px solid var(--dimmer)
+        }
+
+        .gm {
+            padding: 10px 18px;
+            border-left: 2px solid transparent;
+            position: relative;
+            transition: all .2s;
+            border-bottom: 1px solid rgba(0, 200, 255, .04)
+        }
+
+        .gm-head {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 2px
+        }
+
+        .gm-name {
+            font-family: var(--sans);
+            font-weight: 600;
+            font-size: 11px;
+            letter-spacing: 2.5px;
+            color: var(--holo3);
+            text-transform: uppercase
+        }
+
+        .gm-code {
+            font-size: 7px;
+            letter-spacing: 1px;
+            color: var(--textdim)
+        }
+
+        .gm-fx {
+            font-size: 8px;
+            letter-spacing: 2px;
+            color: var(--textdim)
+        }
+
+        .gm-bar {
+            height: 1px;
+            background: var(--dimmer);
+            margin-top: 7px;
+            overflow: hidden;
+            border-radius: 1px
+        }
+
+        .gm-bar-fill {
+            height: 100%;
+            background: var(--holo);
+            width: 0%;
+            transition: width .4s, background .3s
+        }
+
+        .gm.live .gm-name {
+            color: var(--accent)
+        }
+
+        .gm.live .gm-fx {
+            color: rgba(0, 255, 208, .65)
+        }
+
+        .gm.live {
+            border-left-color: var(--accent);
+            background: linear-gradient(90deg, rgba(0, 255, 208, .055), transparent)
+        }
+
+        .gm.live .gm-bar-fill {
+            width: 100%;
+            background: var(--accent);
+            box-shadow: 0 0 6px var(--accent)
+        }
+
+        .gm.armed {
+            border-left-color: var(--holo);
+            background: linear-gradient(90deg, rgba(0, 200, 255, .04), transparent)
+        }
+
+        .gm.armed .gm-bar-fill {
+            width: 60%
+        }
+
+        /* ══ RIGHT PANEL ══ */
+        .rp-block {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--dimmer)
+        }
+
+        .rp-label {
+            font-size: 7px;
+            letter-spacing: 3px;
+            color: var(--textdim);
+            text-transform: uppercase;
+            margin-bottom: 10px
+        }
+
+        /* Confidence arc */
+        .conf-wrap {
+            display: flex;
+            align-items: center;
+            gap: 14px
+        }
+
+        .conf-text .conf-big {
+            font-family: var(--display);
+            font-weight: 700;
+            font-size: 26px;
+            color: var(--holo3);
+            line-height: 1
+        }
+
+        .conf-text .conf-small {
+            font-size: 7px;
+            letter-spacing: 2px;
+            color: var(--textdim);
+            margin-top: 2px
+        }
+
+        /* Finger bars */
+        .finger-bars {
+            display: flex;
+            gap: 4px;
+            align-items: flex-end;
+            height: 48px
+        }
+
+        .fb {
+            flex: 1;
+            background: rgba(0, 200, 255, .07);
+            border-radius: 1px;
+            position: relative;
+            overflow: hidden;
+            border: 1px solid rgba(0, 200, 255, .08)
+        }
+
+        .fb-fill {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            border-radius: 1px;
+            transition: height .12s;
+            background: linear-gradient(0deg, var(--holo2), var(--holo3))
+        }
+
+        .fb-label {
+            position: absolute;
+            bottom: -14px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 6px;
+            color: var(--textdim);
+            letter-spacing: 1px
+        }
+
+        .finger-labels {
+            display: flex;
+            gap: 4px;
+            margin-top: 4px
+        }
+
+        .finger-labels span {
+            flex: 1;
+            text-align: center;
+            font-size: 6px;
+            letter-spacing: 1px;
+            color: var(--textdim)
+        }
+
+        /* Coords */
+        .coord-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px
+        }
+
+        .coord-cell .cc-lbl {
+            font-size: 7px;
+            letter-spacing: 2px;
+            color: var(--textdim)
+        }
+
+        .coord-cell .cc-val {
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 17px;
+            color: var(--holo3);
+            letter-spacing: 1px;
+            line-height: 1.2
+        }
+
+        /* Event log */
+        .ev-row {
+            display: flex;
+            gap: 8px;
+            align-items: baseline;
+            font-size: 8px;
+            padding: 3px 0;
+            border-bottom: 1px solid rgba(0, 200, 255, .04)
+        }
+
+        .ev-ts {
+            color: rgba(0, 200, 255, .3);
+            font-size: 7px;
+            white-space: nowrap
+        }
+
+        .ev-name {
+            color: var(--holo3);
+            flex: 1
+        }
+
+        .ev-fx {
+            color: var(--accent);
+            font-size: 7px;
+            white-space: nowrap
+        }
+
+        /* Waveform */
+        #waveform {
+            height: 36px;
+            width: 100%
+        }
+
+        /* ══ BOTTOM BAR ══ */
+        .b-item {
+            display: flex;
+            flex-direction: column;
+            gap: 1px
+        }
+
+        .b-item .bl {
+            font-size: 6px;
+            letter-spacing: 2px;
+            color: var(--textdim);
+            text-transform: uppercase
+        }
+
+        .b-item .bv {
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 13px;
+            color: var(--holo3);
+            letter-spacing: 1px
+        }
+
+        .ticker-wrap {
+            overflow: hidden;
+            flex: 1;
+            padding: 0 20px
+        }
+
+        .ticker-inner {
+            white-space: nowrap;
+            animation: tickMove 24s linear infinite;
+            font-size: 8px;
+            letter-spacing: 2px;
+            color: var(--textdim)
+        }
+
+        @keyframes tickMove {
+            0% {
+                transform: translateX(100%)
+            }
+
+            100% {
+                transform: translateX(-100%)
+            }
+        }
+
+        /* ══ CANVASES ══ */
+        #bg-c,
+        #fx-c {
+            position: fixed;
+            inset: 0
+        }
+
+        #bg-c {
+            z-index: 1
+        }
+
+        #fx-c {
+            z-index: 3
+        }
+
+        /* ══ ATMOSPHERE ══ */
+        .vignette {
+            position: fixed;
+            inset: 0;
+            z-index: 6;
+            pointer-events: none;
+            background: radial-gradient(ellipse 80% 80% at 50% 50%, transparent 55%, rgba(0, 2, 10, .75) 100%)
+        }
+
+        .holo-glow {
+            position: fixed;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+            background: radial-gradient(ellipse 50% 35% at 50% 50%, rgba(0, 200, 255, .018) 0%, transparent 70%)
+        }
+
+        .grid-lines {
+            position: fixed;
+            inset: 0;
+            z-index: 2;
+            pointer-events: none;
+            background-image: linear-gradient(rgba(0, 150, 200, .03) 1px, transparent 1px), linear-gradient(90deg, rgba(0, 150, 200, .03) 1px, transparent 1px);
+            background-size: 72px 72px;
+        }
+
+        .scanline-sweep {
+            position: fixed;
+            inset: 0;
+            z-index: 5;
+            pointer-events: none;
+            overflow: hidden
+        }
+
+        .scanline-sweep::after {
+            content: '';
+            position: absolute;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(90deg, transparent, rgba(0, 200, 255, .08), transparent);
+            animation: sweep 5s linear infinite;
+        }
+
+        @keyframes sweep {
+            0% {
+                top: -2px
+            }
+
+            100% {
+                top: 100%
+            }
+        }
+
+        /* ══ CENTER HUD ══ */
+        #chud {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            z-index: 5;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity .4s;
+        }
+
+        #chud.show {
+            opacity: 1
+        }
+
+        .chud-ring-outer {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center
+        }
+
+        .chud-ring-outer svg {
+            position: absolute;
+            inset: 0
+        }
+
+        .chud-ring-outer svg.r1 {
+            animation: rotateCW 10s linear infinite
+        }
+
+        .chud-ring-outer svg.r2 {
+            animation: rotateCCW 7s linear infinite
+        }
+
+        @keyframes rotateCW {
+            to {
+                transform: rotate(360deg)
+            }
+        }
+
+        @keyframes rotateCCW {
+            to {
+                transform: rotate(-360deg)
+            }
+        }
+
+        .chud-inner {
+            text-align: center;
+            z-index: 2;
+            position: relative
+        }
+
+        .chud-label {
+            font-family: var(--display);
+            font-weight: 600;
+            font-size: 16px;
+            letter-spacing: 5px;
+            color: var(--holo3);
+            text-transform: uppercase;
+            text-shadow: 0 0 16px rgba(0, 200, 255, .7)
+        }
+
+        .chud-effect {
+            font-size: 7px;
+            letter-spacing: 4px;
+            color: var(--textdim);
+            margin-top: 4px;
+            text-transform: uppercase
+        }
+
+        .chud-conf {
+            font-family: var(--display);
+            font-weight: 300;
+            font-size: 10px;
+            letter-spacing: 3px;
+            color: var(--accent);
+            margin-top: 8px
+        }
+
+        .chud-ticks {
+            position: absolute;
+            inset: 0;
+            background: conic-gradient(from 0deg, transparent 0deg 354deg, rgba(0, 200, 255, .4) 354deg 360deg);
+            border-radius: 50%;
+            animation: rotateCW 3s linear infinite;
+        }
+
+        /* ══ CAMERA ══ */
+        #cam {
+            position: absolute;
+            bottom: 16px;
+            right: 16px;
+            width: 176px;
+            height: 132px;
+            z-index: 20;
+            border: 1px solid rgba(0, 200, 255, .25);
+            background: #000;
+            overflow: hidden;
+        }
+
+        #cam::before {
+            content: 'OPTIC-CAM·DK';
+            position: absolute;
+            top: 5px;
+            left: 7px;
+            z-index: 6;
+            font-size: 6px;
+            letter-spacing: 2px;
+            color: rgba(0, 200, 255, .6)
+        }
+
+        #cam::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 5;
+            pointer-events: none;
+            background: linear-gradient(0deg, rgba(0, 200, 255, .06) 0%, transparent 30%, transparent 70%, rgba(0, 200, 255, .04) 100%)
+        }
+
+        /* corner brackets on cam */
+        .cam-tl,
+        .cam-tr,
+        .cam-bl,
+        .cam-br {
+            position: absolute;
+            z-index: 7;
+            width: 10px;
+            height: 10px;
+            pointer-events: none
+        }
+
+        .cam-tl {
+            top: 0;
+            left: 0;
+            border-top: 1px solid var(--holo);
+            border-left: 1px solid var(--holo)
+        }
+
+        .cam-tr {
+            top: 0;
+            right: 0;
+            border-top: 1px solid var(--holo);
+            border-right: 1px solid var(--holo)
+        }
+
+        .cam-bl {
+            bottom: 0;
+            left: 0;
+            border-bottom: 1px solid var(--holo);
+            border-left: 1px solid var(--holo)
+        }
+
+        .cam-br {
+            bottom: 0;
+            right: 0;
+            border-bottom: 1px solid var(--holo);
+            border-right: 1px solid var(--holo)
+        }
+
+        #video {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            transform: scaleX(-1);
+            display: block;
+            filter: saturate(.2) brightness(.65) hue-rotate(165deg)
+        }
+
+        #ovc {
+            position: absolute;
+            inset: 0;
+            transform: scaleX(-1);
+            z-index: 4
+        }
+
+        /* ══ FLASH ══ */
+        #flash {
+            position: fixed;
+            inset: 0;
+            z-index: 8;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity .08s
+        }
+    </style>
+</head>
+
+<body>
+
+    <div id="cur">
+        <div id="cur-diamond"></div>
+        <div id="cur-dot"></div>
+        <div id="cur-h"></div>
+        <div id="cur-v"></div>
+    </div>
+    <div class="vignette"></div>
+    <div class="holo-glow"></div>
+    <div class="grid-lines"></div>
+    <div class="scanline-sweep"></div>
+    <div id="flash"></div>
+    <canvas id="bg-c"></canvas>
+    <canvas id="fx-c"></canvas>
+
+    <!-- ══════════ BOOT ══════════ -->
+    <div id="boot">
+        <div class="b-eyebrow">Dynamic Kinetics · Neural Interface System</div>
+        <div class="b-logo-wrap">
+            <div class="b-logo">D.K</div>
+            <div class="b-logo-scan"></div>
+        </div>
+        <div class="b-tagline">gesture-driven neural control architecture</div>
+        <div class="b-divider"></div>
+        <div class="b-log">
+            <div class="b-log-row"><span class="btag">SYS</span><span class="bval">Loading MediaPipe Hands — Full
+                    Precision Model</span><span class="bstat">OK</span></div>
+            <div class="b-log-row"><span class="btag">NET</span><span class="bval">Initializing 21-point landmark
+                    tracker</span><span class="bstat">OK</span></div>
+            <div class="b-log-row"><span class="btag">OPT</span><span class="bval">Optical sensor array — 640×480 @
+                    full</span><span class="bstat">OK</span></div>
+            <div class="b-log-row"><span class="btag">FX</span><span class="bval">Particle engine — 3000 unit
+                    capacity</span><span class="bstat">READY</span></div>
+            <div class="b-log-row"><span class="btag">CTRL</span><span class="bval">Gesture classifier — 7 gestures
+                    mapped</span><span class="bstat">ARMED</span></div>
+        </div>
+        <div class="b-bar-wrap">
+            <div class="b-bar-label"><span>SYSTEM INIT</span><span id="bootPct">0%</span></div>
+            <div class="b-bar">
+                <div class="b-bar-fill" id="bootBar"></div>
+            </div>
+        </div>
+        <button class="b-btn" id="initBtn"><span>INITIALIZE D.K SYSTEM</span></button>
+    </div>
+
+    <!-- ══════════ APP ══════════ -->
+    <div id="app">
+
+        <!-- TOP LEFT -->
+        <div class="tl">
+            <div class="sys-dot"></div>
+            <div>
+                <div class="sys-name">D.K</div>
+                <div class="sys-sub">NEURAL GESTURE INTERFACE</div>
+            </div>
+        </div>
+
+        <!-- TOP MIDDLE -->
+        <div class="tm">
+            <div class="hud-metric">
+                <div class="ml">Neural FPS</div>
+                <div class="mv" id="mFps">--</div>
+            </div>
+            <div style="width:1px;height:24px;background:var(--dimmer)"></div>
+            <div class="hud-metric">
+                <div class="ml">Active Hands</div>
+                <div class="mv" id="mHands">0</div>
+            </div>
+            <div style="width:1px;height:24px;background:var(--dimmer)"></div>
+            <div class="hud-metric">
+                <div class="ml">Particles</div>
+                <div class="mv accent" id="mParts">0</div>
+            </div>
+            <div style="width:1px;height:24px;background:var(--dimmer)"></div>
+            <div class="hud-metric">
+                <div class="ml">Current Gesture</div>
+                <div class="mv" id="mGest" style="font-size:13px;letter-spacing:2px">STANDBY</div>
+            </div>
+        </div>
+
+        <!-- TOP RIGHT -->
+        <div class="tr">
+            <div class="badge badge-on" id="sysBadge">OFFLINE</div>
+            <div class="badge badge-mode" id="modeBadge">INIT</div>
+        </div>
+
+        <!-- LEFT PANEL -->
+        <div class="ll">
+            <div class="panel-title">Gesture Command Library</div>
+            <div class="gm" id="gm0">
+                <div class="gm-head">
+                    <div class="gm-name">Open Palm</div>
+                    <div class="gm-code">G·01</div>
+                </div>
+                <div class="gm-fx">DISPERSAL FIELD</div>
+                <div class="gm-bar">
+                    <div class="gm-bar-fill"></div>
+                </div>
+            </div>
+            <div class="gm" id="gm1">
+                <div class="gm-head">
+                    <div class="gm-name">Peace Sign</div>
+                    <div class="gm-code">G·02</div>
+                </div>
+                <div class="gm-fx">ARC DISCHARGE</div>
+                <div class="gm-bar">
+                    <div class="gm-bar-fill"></div>
+                </div>
+            </div>
+            <div class="gm" id="gm2">
+                <div class="gm-head">
+                    <div class="gm-name">Closed Fist</div>
+                    <div class="gm-code">G·03</div>
+                </div>
+                <div class="gm-fx">KINETIC SHOCKWAVE</div>
+                <div class="gm-bar">
+                    <div class="gm-bar-fill"></div>
+                </div>
+            </div>
+            <div class="gm" id="gm3">
+                <div class="gm-head">
+                    <div class="gm-name">Index Point</div>
+                    <div class="gm-code">G·04</div>
+                </div>
+                <div class="gm-fx">DIRECTED ENERGY BEAM</div>
+                <div class="gm-bar">
+                    <div class="gm-bar-fill"></div>
+                </div>
+            </div>
+            <div class="gm" id="gm4">
+                <div class="gm-head">
+                    <div class="gm-name">Pinch</div>
+                    <div class="gm-code">G·05</div>
+                </div>
+                <div class="gm-fx">SINGULARITY VORTEX</div>
+                <div class="gm-bar">
+                    <div class="gm-bar-fill"></div>
+                </div>
+            </div>
+            <div class="gm" id="gm5">
+                <div class="gm-head">
+                    <div class="gm-name">Thumbs Up</div>
+                    <div class="gm-code">G·06</div>
+                </div>
+                <div class="gm-fx">GRAVITY WAVE PULSE</div>
+                <div class="gm-bar">
+                    <div class="gm-bar-fill"></div>
+                </div>
+            </div>
+            <div class="gm" id="gm6" style="margin-top:auto">
+                <div class="gm-head">
+                    <div class="gm-name">Free Move</div>
+                    <div class="gm-code">G·07</div>
+                </div>
+                <div class="gm-fx">PLASMA TRACE STREAM</div>
+                <div class="gm-bar">
+                    <div class="gm-bar-fill"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- CENTER -->
+        <div class="mc">
+            <!-- Gesture ring HUD -->
+            <div id="chud">
+                <div class="chud-ring-outer">
+                    <svg class="r1" viewBox="0 0 220 220" fill="none">
+                        <circle cx="110" cy="110" r="100" stroke="rgba(0,200,255,.12)" stroke-width="1" />
+                        <circle cx="110" cy="110" r="100" stroke="rgba(0,200,255,.55)" stroke-width=".8"
+                            stroke-dasharray="18 2 4 2 8 2 4 2" stroke-dashoffset="0" />
+                    </svg>
+                    <svg class="r2" viewBox="0 0 220 220" fill="none"
+                        style="width:170px;height:170px;position:absolute;top:25px;left:25px">
+                        <circle cx="85" cy="85" r="78" stroke="rgba(0,255,208,.18)" stroke-width=".8"
+                            stroke-dasharray="6 20" />
+                    </svg>
+                    <div class="chud-ticks"></div>
+                    <div class="chud-inner">
+                        <div class="chud-label" id="chudName">STANDBY</div>
+                        <div class="chud-effect" id="chudFx">AWAITING INPUT</div>
+                        <div class="chud-conf" id="chudConf">CONF: --</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Cam -->
+            <div id="cam" style="display:none">
+                <video id="video" autoplay playsinline muted></video>
+                <canvas id="ovc"></canvas>
+                <div class="cam-tl"></div>
+                <div class="cam-tr"></div>
+                <div class="cam-bl"></div>
+                <div class="cam-br"></div>
+            </div>
+        </div>
+
+        <!-- RIGHT PANEL -->
+        <div class="rr">
+            <div class="panel-title">Sensor Analytics</div>
+
+            <!-- Confidence -->
+            <div class="rp-block">
+                <div class="rp-label">Detection Confidence</div>
+                <div class="conf-wrap">
+                    <svg width="56" height="56" viewBox="0 0 56 56">
+                        <circle cx="28" cy="28" r="22" fill="none" stroke="rgba(0,200,255,.08)" stroke-width="3" />
+                        <circle cx="28" cy="28" r="22" fill="none" stroke="var(--accent)" stroke-width="2"
+                            stroke-dasharray="138" id="confArc" stroke-dashoffset="138" stroke-linecap="round"
+                            transform="rotate(-90 28 28)" style="transition:stroke-dashoffset .25s" />
+                    </svg>
+                    <div class="conf-text">
+                        <div class="conf-big" id="confNum">0%</div>
+                        <div class="conf-small">NEURAL CONFIDENCE</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Finger activity -->
+            <div class="rp-block">
+                <div class="rp-label">Finger Extension Map</div>
+                <div class="finger-bars" id="fBars">
+                    <div class="fb">
+                        <div class="fb-fill" style="height:0%"></div>
+                    </div>
+                    <div class="fb">
+                        <div class="fb-fill" style="height:0%"></div>
+                    </div>
+                    <div class="fb">
+                        <div class="fb-fill" style="height:0%"></div>
+                    </div>
+                    <div class="fb">
+                        <div class="fb-fill" style="height:0%"></div>
+                    </div>
+                    <div class="fb">
+                        <div class="fb-fill" style="height:0%"></div>
+                    </div>
+                </div>
+                <div class="finger-labels">
+                    <span>THB</span><span>IDX</span><span>MID</span><span>RNG</span><span>PNK</span></div>
+            </div>
+
+            <!-- Coordinates -->
+            <div class="rp-block">
+                <div class="rp-label">Spatial Coordinates</div>
+                <div class="coord-grid">
+                    <div class="coord-cell">
+                        <div class="cc-lbl">X AXIS</div>
+                        <div class="cc-val" id="cX">---</div>
+                    </div>
+                    <div class="coord-cell">
+                        <div class="cc-lbl">Y AXIS</div>
+                        <div class="cc-val" id="cY">---</div>
+                    </div>
+                    <div class="coord-cell">
+                        <div class="cc-lbl">DEPTH Z</div>
+                        <div class="cc-val" id="cZ">---</div>
+                    </div>
+                    <div class="coord-cell">
+                        <div class="cc-lbl">VELOCITY</div>
+                        <div class="cc-val" id="cVel">---</div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Waveform -->
+            <div class="rp-block">
+                <div class="rp-label">Neural Activity Waveform</div>
+                <canvas id="waveform" height="36"></canvas>
+            </div>
+
+            <!-- Event log -->
+            <div class="rp-block" style="flex:1;overflow:hidden">
+                <div class="rp-label">Command Event Log</div>
+                <div id="evLog" style="display:flex;flex-direction:column;gap:0;overflow:hidden"></div>
+            </div>
+        </div>
+
+        <!-- BOTTOM LEFT -->
+        <div class="bl">
+            <div class="b-item">
+                <div class="bl">Model</div>
+                <div class="bv" style="color:var(--accent);font-size:10px">MEDIAPIPE FULL</div>
+            </div>
+            <div style="width:1px;height:20px;background:var(--dimmer)"></div>
+            <div class="b-item">
+                <div class="bl">Landmarks</div>
+                <div class="bv">21-PT</div>
+            </div>
+        </div>
+
+        <!-- BOTTOM MIDDLE -->
+        <div class="bm">
+            <div class="ticker-wrap">
+                <div class="ticker-inner">D.K NEURAL INTERFACE ACTIVE &nbsp;·&nbsp; MEDIAPIPE HANDS v1 FULL MODEL
+                    &nbsp;·&nbsp; 21-POINT LANDMARK TRACKING &nbsp;·&nbsp; 7 GESTURES MAPPED &nbsp;·&nbsp; REAL-TIME
+                    CLASSIFICATION &nbsp;·&nbsp; KINETIC GESTURE CONTROL &nbsp;·&nbsp; 640×480 OPTICAL INPUT
+                    &nbsp;·&nbsp; PARTICLE ENGINE ONLINE &nbsp;·&nbsp;</div>
+            </div>
+        </div>
+
+        <!-- BOTTOM RIGHT -->
+        <div class="br">
+            <div class="b-item" style="align-items:flex-end">
+                <div class="bl">Resolution</div>
+                <div class="bv">640 × 480</div>
+            </div>
+            <div style="width:1px;height:20px;background:var(--dimmer)"></div>
+            <div class="b-item" style="align-items:flex-end">
+                <div class="bl">Max Hands</div>
+                <div class="bv">2</div>
+            </div>
+        </div>
+
+    </div><!-- #app -->
+
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/camera_utils/camera_utils.js" crossorigin="anonymous"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+    <script>
+        'use strict';
+
+        // ─── CANVAS ───────────────────────────────────────────
+        const bgC = document.getElementById('bg-c'), fxC = document.getElementById('fx-c');
+        const bgX = bgC.getContext('2d'), fxX = fxC.getContext('2d');
+        let W = 0, H = 0;
+        function resize() { W = bgC.width = fxC.width = window.innerWidth; H = bgC.height = fxC.height = window.innerHeight }
+        resize(); window.addEventListener('resize', resize);
+
+        // ─── CURSOR ───────────────────────────────────────────
+        const curEl = document.getElementById('cur');
+        let mx = W / 2, my = H / 2, crx = W / 2, cry = H / 2;
+        document.addEventListener('mousemove', e => { mx = e.clientX; my = e.clientY });
+        function tickCursor() {
+            crx += (mx - crx) * .22; cry += (my - cry) * .22;
+            curEl.style.transform = `translate(${mx}px,${my}px)`;
+        }
+
+        // ─── BOOT PROGRESS ────────────────────────────────────
+        (() => {
+            let p = 0;
+            const fill = document.getElementById('bootBar'), pct = document.getElementById('bootPct');
+            const iv = setInterval(() => {
+                p += Math.random() * 3 + .5; if (p >= 100) { p = 100; clearInterval(iv) }
+                fill.style.width = p + '%'; pct.textContent = Math.floor(p) + '%';
+            }, 60);
+        })();
+
+        // ─── BACKGROUND ───────────────────────────────────────
+        const stars = Array.from({ length: 300 }, () => ({
+            x: Math.random(), y: Math.random(),
+            r: Math.pow(Math.random(), 5) * 1.8 + .1,
+            a: Math.random() * .5 + .05, va: (Math.random() - .5) * .0015
+        }));
+        const arcs = [
+            { r: .32, spd: .00018, dash: [24, 320], col: 'rgba(0,160,200,.055)', w: .8 },
+            { r: .45, spd: -.00012, dash: [8, 80], col: 'rgba(0,180,220,.04)', w: .6 },
+            { r: .55, spd: .00009, dash: [40, 500], col: 'rgba(0,120,180,.05)', w: .8 },
+        ];
+        let bgRot = 0;
+        function drawBg() {
+            bgX.fillStyle = 'rgba(0,2,10,.18)'; bgX.fillRect(0, 0, W, H);
+            bgRot += .00045;
+            const cx = W / 2, cy = H / 2, mn = Math.min(W, H);
+            arcs.forEach(a => {
+                bgX.save(); bgX.translate(cx, cy); bgX.rotate(bgRot * a.spd * 2000);
+                bgX.beginPath(); bgX.arc(0, 0, a.r * mn, 0, Math.PI * 2);
+                bgX.strokeStyle = a.col; bgX.lineWidth = a.w; bgX.setLineDash(a.dash); bgX.stroke(); bgX.setLineDash([]); bgX.restore();
+            });
+            stars.forEach(s => {
+                s.a += s.va; if (s.a < .03 || s.a > .6) s.va *= -1;
+                bgX.beginPath(); bgX.arc(s.x * W, s.y * H, s.r, 0, Math.PI * 2);
+                bgX.fillStyle = `rgba(180,225,245,${s.a})`; bgX.fill();
+            });
+        }
+
+        // ─── WAVEFORM ─────────────────────────────────────────
+        const waveCanvas = document.getElementById('waveform');
+        const waveCtx = waveCanvas.getContext('2d');
+        const waveBuf = Array(120).fill(0);
+        let waveTarget = 0;
+        function pushWave(v) { waveTarget = v }
+        function drawWave() {
+            const ow = waveCanvas.offsetWidth, oh = 36;
+            waveCanvas.width = ow; waveCanvas.height = oh;
+            waveBuf.push(waveTarget * oh * .4 + oh / 2 + (Math.random() - .5) * (waveTarget * 4));
+            waveBuf.shift();
+            waveCtx.clearRect(0, 0, ow, oh);
+            waveCtx.beginPath();
+            const step = ow / (waveBuf.length - 1);
+            waveBuf.forEach((v, i) => {
+                const x = i * step, y = v;
+                i === 0 ? waveCtx.moveTo(x, y) : waveCtx.lineTo(x, y);
+            });
+            waveCtx.strokeStyle = 'rgba(0,200,255,.55)'; waveCtx.lineWidth = 1;
+            waveCtx.shadowBlur = 6; waveCtx.shadowColor = 'var(--holo)';
+            waveCtx.stroke();
+        }
+
+        // ─── PARTICLES ────────────────────────────────────────
+        const P = []; const PMAX = 3000;
+        function addP(x, y, c) { if (P.length < PMAX) P.push({ x, y, life: 1, ...c }) }
+        const PTYPES = {
+            dispersal: { n: 55, sp: [.4, 3.5], h: [182, 215], g: -.008, dc: [.005, .009], r: [.7, 2.8], sat: 65 },
+            shock: { n: 100, sp: [4, 18], h: [185, 205], g: .2, dc: [.007, .015], r: [1, 4.5], sat: 70 },
+            beam: { n: 28, sp: [1, 4.5], h: [52, 72], g: .03, dc: [.01, .02], r: [.6, 2], sat: 90 },
+            lightning: { n: 22, sp: [2, 7], h: [186, 198], g: .07, dc: [.011, .02], r: [.8, 2], sat: 65 },
+            vortex: { n: 40, sp: [.8, 3], h: [190, 230], g: 0, dc: [.005, .009], r: [.7, 2.5], sat: 70 },
+            gravity: { n: 70, sp: [2, 12], h: [165, 185], g: .12, dc: [.006, .013], r: [1, 3.5], sat: 60 },
+            plasma: { n: 8, sp: [.3, 1.2], h: [185, 215], g: -.004, dc: [.012, .02], r: [.5, 1.5], sat: 60 },
+        };
+        function burst(x, y, type) {
+            const t = PTYPES[type]; if (!t) return;
+            for (let i = 0; i < t.n; i++) {
+                const a = Math.random() * Math.PI * 2, sp = t.sp[0] + Math.random() * (t.sp[1] - t.sp[0]);
+                const h = t.h[0] + Math.random() * (t.h[1] - t.h[0]), r = t.r[0] + Math.random() * (t.r[1] - t.r[0]);
+                addP(x, y, { vx: Math.cos(a) * sp, vy: Math.sin(a) * sp, h, sat: t.sat, r, g: t.g, dc: t.dc[0] + Math.random() * (t.dc[1] - t.dc[0]), type });
+            }
+        }
+        function tickParticles() {
+            for (let i = P.length - 1; i >= 0; i--) {
+                const p = P[i];
+                if (vortex && vortex.life > 0) {
+                    const dx = vortex.x - p.x, dy = vortex.y - p.y, d = Math.hypot(dx, dy) || 1;
+                    if (d < vortex.r * 1.2) { p.vx += dx / d * .65; p.vy += dy / d * .65; p.vx -= dy / d * 2.2; p.vy += dx / d * 2.2 }
+                }
+                if (gravWave && gravWave.life > 0) {
+                    const dx = p.x - gravWave.x, dy = p.y - gravWave.y, d = Math.hypot(dx, dy) || 1;
+                    const ring = gravWave.r; if (Math.abs(d - ring) < 60) { p.vx += dx / d * 1.5; p.vy += dy / d * 1.5 }
+                }
+                p.vx *= .965; p.vy *= .965; p.x += p.vx; p.y += p.vy + p.g; p.life -= p.dc;
+                if (p.life <= 0) { P.splice(i, 1); continue }
+                fxX.save();
+                const glow = (p.type === 'shock' || p.type === 'beam' || p.type === 'gravity');
+                if (glow) { fxX.shadowBlur = 8; fxX.shadowColor = `hsl(${p.h},${p.sat}%,70%)` }
+                fxX.globalAlpha = p.life * p.life;
+                fxX.beginPath(); fxX.arc(p.x, p.y, p.r * p.life, 0, Math.PI * 2);
+                fxX.fillStyle = `hsl(${p.h},${p.sat}%,${52 + p.life * 18}%)`;
+                fxX.fill(); fxX.restore();
+            }
+        }
+
+        // ─── PLASMA TRAIL ─────────────────────────────────────
+        const trail = []; let trailH = 190;
+        function pushTrail(x, y) { trail.push({ x, y }); if (trail.length > 110) trail.shift(); trailH = (trailH + .7) % 360 }
+        function drawTrail() {
+            if (trail.length < 3) return;
+            fxX.save(); fxX.lineCap = 'round'; fxX.lineJoin = 'round';
+            for (let i = 2; i < trail.length; i++) {
+                const t = i / trail.length;
+                fxX.beginPath(); fxX.moveTo(trail[i - 1].x, trail[i - 1].y); fxX.lineTo(trail[i].x, trail[i].y);
+                fxX.strokeStyle = `hsla(${190 + t * 15},65%,58%,${t * .55})`;
+                fxX.lineWidth = t * 7; fxX.shadowBlur = 8; fxX.shadowColor = 'rgba(0,200,255,.35)'; fxX.stroke();
+            }
+            // white-hot core
+            fxX.strokeStyle = 'rgba(200,240,255,.2)'; fxX.lineWidth = .8; fxX.shadowBlur = 0;
+            fxX.beginPath(); trail.forEach((p, i) => { i === 0 ? fxX.moveTo(p.x, p.y) : fxX.lineTo(p.x, p.y) }); fxX.stroke();
+            fxX.restore();
+        }
+
+        // ─── SHOCKWAVE ────────────────────────────────────────
+        const shocks = [];
+        function spawnShock(x, y) { shocks.push({ x, y, r: 6, life: 1 }); burst(x, y, 'shock'); doFlash(0, 180, 220, .32) }
+        function drawShocks() {
+            for (let i = shocks.length - 1; i >= 0; i--) {
+                const s = shocks[i]; s.r += 15; s.life = 1 - s.r / 330;
+                if (s.life <= 0) { shocks.splice(i, 1); continue }
+                fxX.save(); fxX.globalAlpha = s.life;
+                for (let j = 0; j < 4; j++) {
+                    const rr = s.r - j * 24 * s.life; if (rr < 0) continue;
+                    fxX.beginPath(); fxX.arc(s.x, s.y, rr, 0, Math.PI * 2);
+                    fxX.strokeStyle = `hsla(${192 + j * 5},75%,${58 - j * 7}%,${s.life})`;
+                    fxX.lineWidth = 2.2 - j * .4; fxX.shadowBlur = 10; fxX.shadowColor = 'var(--holo)'; fxX.stroke();
+                }
+                fxX.restore();
+            }
+        }
+
+        // ─── LIGHTNING ────────────────────────────────────────
+        const bolts = [];
+        function spawnLightning(ox, oy) {
+            const b = { segs: [], br: [], life: 1 }; let cx = ox, cy = oy;
+            for (let i = 0; i < 16; i++) {
+                const nx = cx + (Math.random() - .5) * 150, ny = cy - Math.random() * 85 - 8;
+                b.segs.push({ x1: cx, y1: cy, x2: nx, y2: ny });
+                if (Math.random() > .5) { b.br.push({ x1: nx, y1: ny, x2: nx + (Math.random() - .5) * 75, y2: ny - Math.random() * 55 }) }
+                cx = nx; cy = ny;
+            }
+            bolts.push(b); burst(ox, oy, 'lightning'); doFlash(0, 200, 245, .18);
+        }
+        function drawBolts() {
+            for (let i = bolts.length - 1; i >= 0; i--) {
+                const b = bolts[i]; b.life -= .06; if (b.life <= 0) { bolts.splice(i, 1); continue }
+                const ds = (segs, w, c) => {
+                    fxX.save(); fxX.globalAlpha = b.life; fxX.lineWidth = w; fxX.strokeStyle = c;
+                    fxX.shadowBlur = 14; fxX.shadowColor = 'rgba(0,200,255,.8)'; fxX.lineCap = 'round';
+                    segs.forEach(s => { const j = (Math.random() - .5) * 8; fxX.beginPath(); fxX.moveTo(s.x1 + j, s.y1); fxX.lineTo(s.x2 + j, s.y2); fxX.stroke() });
+                    fxX.strokeStyle = `rgba(200,245,255,${b.life * .8})`; fxX.lineWidth = w * .2; fxX.shadowBlur = 0;
+                    segs.forEach(s => { fxX.beginPath(); fxX.moveTo(s.x1, s.y1); fxX.lineTo(s.x2, s.y2); fxX.stroke() });
+                    fxX.restore();
+                };
+                ds(b.segs, 2.5, `rgba(60,195,245,${b.life})`); ds(b.br, 1.2, `rgba(40,175,225,${b.life * .65})`);
+            }
+        }
+
+        // ─── DIRECTED BEAM ────────────────────────────────────
+        const beams = [];
+        function spawnBeam(x, y) { beams.push({ x, y, len: 0, max: H * .88, life: 1 }); burst(x, y, 'beam'); doFlash(160, 140, 0, .18) }
+        function drawBeams() {
+            for (let i = beams.length - 1; i >= 0; i--) {
+                const b = beams[i]; b.len = Math.min(b.len + 60, b.max); b.life -= .02;
+                if (b.life <= 0) { beams.splice(i, 1); continue }
+                fxX.save(); fxX.globalAlpha = b.life;
+                const ey = b.y - b.len;
+                const g = fxX.createLinearGradient(b.x, b.y, b.x, ey);
+                g.addColorStop(0, 'rgba(0,200,255,1)'); g.addColorStop(.35, 'rgba(0,255,200,.7)'); g.addColorStop(1, 'transparent');
+                fxX.strokeStyle = g; fxX.lineWidth = 16 * b.life; fxX.shadowBlur = 28; fxX.shadowColor = 'var(--holo)';
+                fxX.beginPath(); fxX.moveTo(b.x, b.y); fxX.lineTo(b.x, ey); fxX.stroke();
+                fxX.strokeStyle = 'rgba(230,250,255,.9)'; fxX.lineWidth = 2 * b.life; fxX.shadowBlur = 0;
+                fxX.beginPath(); fxX.moveTo(b.x, b.y); fxX.lineTo(b.x, ey); fxX.stroke();
+                // side interference fringes
+                for (let j = 1; j <= 4; j++) {
+                    fxX.globalAlpha = b.life * (0.18 - j * .03); fxX.strokeStyle = g; fxX.lineWidth = (10 - j * 2) * b.life;
+                    fxX.beginPath(); fxX.moveTo(b.x + j * 14, b.y); fxX.lineTo(b.x + j * 9, ey); fxX.stroke();
+                    fxX.beginPath(); fxX.moveTo(b.x - j * 14, b.y); fxX.lineTo(b.x - j * 9, ey); fxX.stroke();
+                }
+                fxX.restore();
+            }
+        }
+
+        // ─── SINGULARITY VORTEX ───────────────────────────────
+        let vortex = null;
+        function spawnVortex(x, y) { vortex = { x, y, r: 0, max: 230, angle: 0, life: 1 }; burst(x, y, 'vortex') }
+        function drawVortex() {
+            if (!vortex) return;
+            vortex.r = Math.min(vortex.r + 4, vortex.max); vortex.angle += .055; vortex.life -= .007;
+            if (vortex.life <= 0) { vortex = null; return }
+            const v = vortex;
+            fxX.save(); fxX.globalAlpha = v.life;
+            const gc = fxX.createRadialGradient(v.x, v.y, 0, v.x, v.y, v.r * .32);
+            gc.addColorStop(0, 'rgba(0,1,6,.98)'); gc.addColorStop(1, 'transparent');
+            fxX.fillStyle = gc; fxX.beginPath(); fxX.arc(v.x, v.y, v.r * .32, 0, Math.PI * 2); fxX.fill();
+            for (let ring = 0; ring < 12; ring++) {
+                const rr = v.r * (ring / 12), hue = 186 + ring * 3.5;
+                fxX.strokeStyle = `hsla(${hue},72%,54%,${(1 - ring / 12) * .55})`;
+                fxX.shadowColor = `hsl(${hue},80%,65%)`; fxX.shadowBlur = 7; fxX.lineWidth = 1.2;
+                fxX.beginPath();
+                for (let a = 0; a < Math.PI * 8; a += .05) {
+                    const sp = rr * (a / (Math.PI * 8));
+                    const rx = v.x + Math.cos(a + v.angle + ring * .55) * sp, ry = v.y + Math.sin(a + v.angle + ring * .55) * sp;
+                    a < .06 ? fxX.moveTo(rx, ry) : fxX.lineTo(rx, ry);
+                }
+                fxX.stroke();
+            }
+            fxX.strokeStyle = `rgba(0,255,200,${v.life * .55})`; fxX.lineWidth = 1.5; fxX.shadowBlur = 18; fxX.shadowColor = 'var(--accent)';
+            fxX.beginPath(); fxX.arc(v.x, v.y, v.r * .32, 0, Math.PI * 2); fxX.stroke();
+            fxX.restore();
+        }
+
+        // ─── GRAVITY WAVE (Thumbs Up) ─────────────────────────
+        let gravWave = null;
+        function spawnGravWave(x, y) {
+            gravWave = { x, y, r: 0, max: W * .7, life: 1, rings: [] };
+            for (let i = 0; i < 5; i++)gravWave.rings.push({ r: 0, delay: i * 18 });
+            burst(x, y, 'gravity'); doFlash(0, 160, 180, .22);
+        }
+        function drawGravWave() {
+            if (!gravWave) return;
+            gravWave.r += 8; gravWave.life -= .006;
+            if (gravWave.life <= 0) { gravWave = null; return }
+            const g = gravWave;
+            fxX.save();
+            g.rings.forEach((ring, i) => {
+                ring.r += 7;
+                const frac = ring.r / g.max; if (frac > 1) return;
+                const alpha = g.life * (1 - frac) * .7;
+                fxX.globalAlpha = alpha;
+                // Draw ring as thick interference pattern
+                const hue = 186 + i * 4;
+                fxX.strokeStyle = `hsl(${hue},70%,55%)`;
+                fxX.shadowBlur = 14; fxX.shadowColor = `hsl(${hue},80%,65%)`;
+                fxX.lineWidth = 2.5 - i * .3;
+                fxX.beginPath(); fxX.arc(g.x, g.y, ring.r, 0, Math.PI * 2); fxX.stroke();
+                // Inner glow ring
+                fxX.globalAlpha = alpha * .4; fxX.lineWidth = 12 - i * 2;
+                fxX.strokeStyle = `hsla(${hue},70%,60%,.3)`;
+                fxX.beginPath(); fxX.arc(g.x, g.y, ring.r, 0, Math.PI * 2); fxX.stroke();
+            });
+            fxX.restore();
+        }
+
+        // ─── SCREEN FLASH ─────────────────────────────────────
+        let flashA = 0, flashR = 0, flashG = 0, flashB = 0;
+        function doFlash(r, g, b, a) { flashR = r; flashG = g; flashB = b; flashA = a }
+        function tickFlash() {
+            if (flashA <= 0) return;
+            const el = document.getElementById('flash');
+            el.style.background = `rgba(${flashR},${flashG},${flashB},${flashA})`;
+            el.style.opacity = '1';
+            flashA = Math.max(0, flashA - .045);
+            if (flashA <= 0) el.style.opacity = '0';
+        }
+
+        // ─── GESTURE INFO ──────────────────────────────────────
+        const GINFO = {
+            OPEN: { name: 'OPEN PALM', fx: 'DISPERSAL FIELD', gm: 'gm0', cur: 'g-open', wave: .35 },
+            PEACE: { name: 'PEACE SIGN', fx: 'ARC DISCHARGE', gm: 'gm1', cur: '', wave: .7 },
+            FIST: { name: 'CLOSED FIST', fx: 'KINETIC SHOCKWAVE', gm: 'gm2', cur: 'g-fist', wave: 1 },
+            POINT: { name: 'INDEX POINT', fx: 'DIRECTED BEAM', gm: 'gm3', cur: 'g-beam', wave: .85 },
+            PINCH: { name: 'PINCH', fx: 'SINGULARITY', gm: 'gm4', cur: 'g-vortex', wave: .65 },
+            THUMB: { name: 'THUMBS UP', fx: 'GRAVITY WAVE', gm: 'gm5', cur: '', wave: .9 },
+            MOVE: { name: 'FREE MOVE', fx: 'PLASMA TRACE', gm: 'gm6', cur: '', wave: .2 },
+            NONE: { name: 'STANDBY', fx: 'AWAITING INPUT', gm: null, cur: '', wave: 0 },
+        };
+
+        let lastG = 'NONE', lastT = 0, chudTimer = null;
+        let prevX = -1, prevY = -1, vel = 0;
+
+        function setGesture(g, wx, wy, lm) {
+            const now = Date.now();
+            if (g === lastG && now - lastT < (g === 'MOVE' ? 999 : 280)) return;
+            lastG = g; lastT = now;
+            const info = GINFO[g] || GINFO.NONE;
+            pushWave(info.wave);
+
+            // Update text HUD
+            document.getElementById('mGest').textContent = g;
+            document.getElementById('chudName').textContent = info.name;
+            document.getElementById('chudFx').textContent = info.fx;
+            document.getElementById('modeBadge').textContent = g === 'NONE' ? 'SCANNING' : info.name;
+
+            // Cursor class
+            curEl.className = info.cur;
+
+            // Side panel
+            document.querySelectorAll('.gm').forEach(el => el.classList.remove('live'));
+            if (info.gm) {
+                const el = document.getElementById(info.gm);
+                if (el) el.classList.add('live');
+            }
+            document.querySelectorAll('.gm').forEach(el => el.classList.toggle('armed', g !== 'NONE'));
+
+            // Center HUD
+            if (g !== 'NONE' && g !== 'MOVE') {
+                document.getElementById('chud').classList.add('show');
+                clearTimeout(chudTimer);
+                chudTimer = setTimeout(() => document.getElementById('chud').classList.remove('show'), 2000);
+            }
+
+            // Event log
+            if (g !== 'NONE' && g !== 'MOVE') {
+                const log = document.getElementById('evLog');
+                const d = new Date(), ts = `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}:${d.getSeconds().toString().padStart(2, '0')}`;
+                const row = document.createElement('div'); row.className = 'ev-row';
+                row.innerHTML = `<span class="ev-ts">${ts}</span><span class="ev-name">${info.name}</span><span class="ev-fx">${info.fx}</span>`;
+                log.prepend(row); while (log.children.length > 7) log.removeChild(log.lastChild);
+            }
+
+            // Effects
+            switch (g) {
+                case 'OPEN':
+                    burst(wx, wy, 'dispersal');
+                    burst(wx + (Math.random() - .5) * 50, wy + (Math.random() - .5) * 50, 'dispersal');
+                    break;
+                case 'PEACE':
+                    if (lm) { spawnLightning((1 - lm[8].x) * W, lm[8].y * H); spawnLightning((1 - lm[12].x) * W, lm[12].y * H); setTimeout(() => spawnLightning((1 - lm[8].x) * W, lm[8].y * H), 100) }
+                    else spawnLightning(wx, wy);
+                    break;
+                case 'FIST':
+                    spawnShock(wx, wy);
+                    break;
+                case 'POINT':
+                    spawnBeam(lm ? (1 - lm[8].x) * W : wx, lm ? lm[8].y * H : wy);
+                    break;
+                case 'PINCH':
+                    spawnVortex(wx, wy);
+                    break;
+                case 'THUMB':
+                    spawnGravWave(wx, wy);
+                    break;
+            }
+        }
+
+        // ─── CLASSIFY ─────────────────────────────────────────
+        function classify(lm) {
+            const TIPS = [8, 12, 16, 20], BASES = [6, 10, 14, 18];
+            const ext = TIPS.map((t, i) => lm[t].y < lm[BASES[i]].y);
+            const pinch = Math.hypot(lm[4].x - lm[8].x, lm[4].y - lm[8].y) < 0.055;
+            // Thumbs up: thumb tip above thumb base, all fingers folded
+            const thumbUp = lm[4].y < lm[3].y && lm[4].y < lm[2].y && !ext[0] && !ext[1] && !ext[2] && !ext[3];
+            if (pinch) return 'PINCH';
+            if (thumbUp) return 'THUMB';
+            if (ext.every(Boolean)) return 'OPEN';
+            if (ext.every(v => !v)) return 'FIST';
+            if (ext[0] && !ext[1] && !ext[2] && !ext[3]) return 'POINT';
+            if (ext[0] && ext[1] && !ext[2] && !ext[3]) return 'PEACE';
+            return 'MOVE';
+        }
+
+        // ─── MEDIAPIPE RESULTS ────────────────────────────────
+        let fc = 0, lastFT = performance.now(), fps = 0;
+
+        function onResults(res) {
+            fc++; const now = performance.now();
+            if (now - lastFT >= 1000) { fps = fc; fc = 0; lastFT = now; document.getElementById('mFps').textContent = fps }
+            document.getElementById('mParts').textContent = P.length;
+
+            const ov = document.getElementById('ovc');
+            const oc = ov.getContext('2d');
+            ov.width = 176; ov.height = 132; oc.clearRect(0, 0, 176, 132);
+
+            const has = res.multiHandLandmarks?.length > 0;
+            document.getElementById('mHands').textContent = has ? res.multiHandLandmarks.length : 0;
+
+            if (!has) {
+                if (trail.length) trail.shift();
+                ['cX', 'cY', 'cZ', 'cVel'].forEach(id => document.getElementById(id).textContent = '---');
+                document.getElementById('confNum').textContent = '0%';
+                document.getElementById('confArc').style.strokeDashoffset = '138';
+                document.getElementById('chudConf').textContent = 'CONF: --';
+                document.querySelectorAll('#fBars .fb-fill').forEach(b => b.style.height = '0%');
+                document.querySelectorAll('.gm').forEach(el => el.classList.remove('armed', 'live'));
+                pushWave(0);
+                setGesture('NONE', 0, 0, null);
+                return;
+            }
+
+            const lm = res.multiHandLandmarks[0];
+            const conf = Math.round(Math.min(99, 84 + Math.random() * 15));
+            document.getElementById('confNum').textContent = conf + '%';
+            document.getElementById('confArc').style.strokeDashoffset = String(138 * (1 - conf / 100));
+            document.getElementById('chudConf').textContent = `CONF: ${conf}%`;
+
+            // Finger extension bars
+            const TIPS = [8, 12, 16, 20], BASES = [6, 10, 14, 18];
+            const ext = TIPS.map((t, i) => lm[t].y < lm[BASES[i]].y);
+            const thumbExt = lm[4].y < lm[2].y;
+            const allExt = [thumbExt, ...ext];
+            document.querySelectorAll('#fBars .fb-fill').forEach((b, i) => {
+                b.style.height = (allExt[i] ? 55 + Math.random() * 20 : 8 + Math.random() * 8) + '%';
+            });
+
+            // Position
+            const wx = (1 - lm[9].x) * W, wy = lm[9].y * H;
+            if (prevX >= 0) vel = Math.round(Math.hypot(wx - prevX, wy - prevY));
+            prevX = wx; prevY = wy;
+            document.getElementById('cX').textContent = Math.round(wx);
+            document.getElementById('cY').textContent = Math.round(wy);
+            document.getElementById('cZ').textContent = (lm[9].z * 100).toFixed(1);
+            document.getElementById('cVel').textContent = vel;
+
+            // Skeleton overlay
+            const CONN = [[0, 1], [1, 2], [2, 3], [3, 4], [0, 5], [5, 6], [6, 7], [7, 8], [5, 9], [9, 10], [10, 11], [11, 12], [9, 13], [13, 14], [14, 15], [15, 16], [13, 17], [17, 18], [18, 19], [19, 20], [0, 17]];
+            CONN.forEach(([a, b]) => {
+                oc.beginPath(); oc.moveTo(lm[a].x * 176, lm[a].y * 132); oc.lineTo(lm[b].x * 176, lm[b].y * 132);
+                oc.strokeStyle = 'rgba(0,200,255,.5)'; oc.lineWidth = .9; oc.shadowBlur = 3; oc.shadowColor = 'rgba(0,200,255,.7)'; oc.stroke();
+            });
+            lm.forEach((p, idx) => {
+                const tip = [4, 8, 12, 16, 20].includes(idx);
+                oc.beginPath(); oc.arc(p.x * 176, p.y * 132, tip ? 2.8 : 1.6, 0, Math.PI * 2);
+                oc.fillStyle = tip ? 'var(--accent)' : 'var(--holo3)'; oc.shadowBlur = tip ? 7 : 3; oc.shadowColor = tip ? 'var(--accent)' : 'var(--holo)'; oc.fill();
+            });
+
+            pushTrail(wx, wy);
+            const g = classify(lm);
+            if (g === 'OPEN' && Math.random() > .78) burst(wx + (Math.random() - .5) * 35, wy + (Math.random() - .5) * 35, 'dispersal');
+            setGesture(g, wx, wy, lm);
+        }
+
+        // ─── MAIN LOOP ────────────────────────────────────────
+        function loop() {
+            requestAnimationFrame(loop);
+            drawBg();
+            fxX.clearRect(0, 0, W, H);
+            tickFlash(); drawTrail(); tickParticles();
+            drawShocks(); drawBolts(); drawBeams(); drawVortex(); drawGravWave();
+            drawWave(); tickCursor();
+        }
+        loop();
+
+        // ─── INIT ─────────────────────────────────────────────
+        document.getElementById('initBtn').addEventListener('click', async () => {
+            document.getElementById('boot').classList.add('exit');
+            setTimeout(() => { const b = document.getElementById('boot'); if (b) b.remove() }, 1300);
+            document.getElementById('cam').style.display = 'block';
+            document.getElementById('chud').classList.add('show');
+
+            const sysBadge = document.getElementById('sysBadge');
+            sysBadge.textContent = 'ONLINE'; sysBadge.style.borderColor = 'var(--accent)'; sysBadge.style.color = 'var(--accent)';
+
+            const video = document.getElementById('video');
+            const hands = new Hands({ locateFile: f => `https://cdn.jsdelivr.net/npm/@mediapipe/hands/${f}` });
+            hands.setOptions({ maxNumHands: 2, modelComplexity: 1, minDetectionConfidence: .72, minTrackingConfidence: .65 });
+            hands.onResults(onResults);
+
+            const cam = new Camera(video, { onFrame: async () => { await hands.send({ image: video }) }, width: 640, height: 480 });
+            try {
+                await cam.start();
+                document.getElementById('modeBadge').textContent = 'TRACKING';
+                // boot log entry
+                const log = document.getElementById('evLog');
+                const row = document.createElement('div'); row.className = 'ev-row';
+                row.innerHTML = `<span class="ev-ts">BOOT</span><span class="ev-name">D.K SYSTEM ONLINE</span><span class="ev-fx">READY</span>`;
+                log.prepend(row);
+            } catch (e) {
+                document.getElementById('modeBadge').textContent = 'CAM ERR';
+                alert('Camera access denied — please allow and reload.');
+            }
+        });
+    </script>
+</body>
+
+</html>
