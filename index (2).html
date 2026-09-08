@@ -1,0 +1,1949 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>BMW · Intelligence</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/Chart.js/4.4.0/chart.umd.min.js"></script>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link
+        href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;600;700;900&family=Rajdhani:wght@300;400;500;600;700&family=Space+Mono:ital,wght@0,400;0,700;1,400&display=swap"
+        rel="stylesheet">
+    <style>
+        :root {
+            --blue: #1c69d4;
+            --blue2: #0e3fa8;
+            --cyan: #00c8ff;
+            --dark: #03040a;
+            --dark2: #080c18;
+            --silver: #a8b4c8;
+            --white: #e8f0ff;
+            --glow: 0 0 40px rgba(28, 105, 212, 0.7), 0 0 80px rgba(28, 105, 212, 0.3);
+            --glow-cyan: 0 0 30px rgba(0, 200, 255, 0.6);
+        }
+
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            width: 100vw;
+            height: 100vh;
+            overflow: hidden;
+            background: var(--dark);
+            color: var(--white);
+        }
+
+        /* ── CUSTOM CURSOR ── */
+        body {
+            cursor: none;
+        }
+
+        #cursor {
+            position: fixed;
+            width: 12px;
+            height: 12px;
+            border-radius: 50%;
+            background: var(--cyan);
+            pointer-events: none;
+            z-index: 99999;
+            transform: translate(-50%, -50%);
+            transition: width .2s, height .2s, background .2s;
+            mix-blend-mode: screen;
+        }
+
+        #cursor-ring {
+            position: fixed;
+            width: 36px;
+            height: 36px;
+            border-radius: 50%;
+            border: 1px solid rgba(0, 200, 255, 0.5);
+            pointer-events: none;
+            z-index: 99998;
+            transform: translate(-50%, -50%);
+            transition: all .12s ease;
+        }
+
+        body:has(button:hover) #cursor,
+        body:has(a:hover) #cursor {
+            width: 20px;
+            height: 20px;
+        }
+
+        /* ── CANVAS BG ── */
+        #bg-canvas {
+            position: fixed;
+            inset: 0;
+            z-index: 0;
+            opacity: 0.5;
+        }
+
+        /* ── SCANLINES ── */
+        .scanlines {
+            position: fixed;
+            inset: 0;
+            pointer-events: none;
+            z-index: 1;
+            background: repeating-linear-gradient(0deg, transparent, transparent 3px, rgba(0, 0, 0, 0.04) 3px, rgba(0, 0, 0, 0.04) 4px);
+        }
+
+        /* ════════════════════════════
+   INTRO SCREEN
+════════════════════════════ */
+        #intro {
+            position: fixed;
+            inset: 0;
+            z-index: 200;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 0;
+            background: radial-gradient(ellipse 80% 70% at 50% 50%, #0a1628 0%, #03040a 100%);
+            overflow: hidden;
+        }
+
+        /* Intro background car silhouette */
+        .intro-bg-car {
+            position: absolute;
+            bottom: 0;
+            left: 50%;
+            transform: translateX(-50%);
+            width: 90%;
+            max-width: 1100px;
+            opacity: 0.04;
+            filter: blur(1px);
+            pointer-events: none;
+            z-index: 0;
+        }
+
+        /* Horizontal speed lines */
+        .speed-lines {
+            position: absolute;
+            inset: 0;
+            overflow: hidden;
+            pointer-events: none;
+        }
+
+        .speed-line {
+            position: absolute;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(28, 105, 212, 0.4), transparent);
+            animation: speed-sweep linear infinite;
+        }
+
+        @keyframes speed-sweep {
+            from {
+                transform: translateX(-100%)
+            }
+
+            to {
+                transform: translateX(100vw)
+            }
+        }
+
+        /* Corner decorations */
+        .corner {
+            position: absolute;
+            width: 60px;
+            height: 60px;
+        }
+
+        .corner.tl {
+            top: 24px;
+            left: 24px;
+            border-top: 2px solid rgba(0, 200, 255, 0.4);
+            border-left: 2px solid rgba(0, 200, 255, 0.4);
+        }
+
+        .corner.tr {
+            top: 24px;
+            right: 24px;
+            border-top: 2px solid rgba(0, 200, 255, 0.4);
+            border-right: 2px solid rgba(0, 200, 255, 0.4);
+        }
+
+        .corner.bl {
+            bottom: 24px;
+            left: 24px;
+            border-bottom: 2px solid rgba(0, 200, 255, 0.4);
+            border-left: 2px solid rgba(0, 200, 255, 0.4);
+        }
+
+        .corner.br {
+            bottom: 24px;
+            right: 24px;
+            border-bottom: 2px solid rgba(0, 200, 255, 0.4);
+            border-right: 2px solid rgba(0, 200, 255, 0.4);
+        }
+
+        /* Logo stage */
+        .logo-stage {
+            position: relative;
+            width: 220px;
+            height: 220px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            animation: logo-burst 1.8s cubic-bezier(.16, 1, .3, 1) forwards;
+            opacity: 0;
+            margin-bottom: 32px;
+        }
+
+        @keyframes logo-burst {
+            0% {
+                opacity: 0;
+                transform: scale(0) rotate(-270deg);
+                filter: blur(40px);
+            }
+
+            50% {
+                filter: blur(0);
+            }
+
+            75% {
+                transform: scale(1.1) rotate(6deg);
+            }
+
+            100% {
+                opacity: 1;
+                transform: scale(1) rotate(0deg);
+                filter: blur(0);
+            }
+        }
+
+        .intro-logo-img {
+            width: 160px;
+            height: 160px;
+            border-radius: 50%;
+            object-fit: contain;
+            position: relative;
+            z-index: 3;
+            filter: drop-shadow(0 0 30px rgba(28, 105, 212, 1)) drop-shadow(0 0 60px rgba(0, 200, 255, 0.4));
+            animation: logo-breathe 4s ease-in-out infinite 2s;
+        }
+
+        @keyframes logo-breathe {
+
+            0%,
+            100% {
+                filter: drop-shadow(0 0 30px rgba(28, 105, 212, 1)) drop-shadow(0 0 60px rgba(0, 200, 255, 0.3));
+            }
+
+            50% {
+                filter: drop-shadow(0 0 60px rgba(28, 105, 212, 1)) drop-shadow(0 0 120px rgba(0, 200, 255, 0.6));
+            }
+        }
+
+        /* Orbit rings */
+        .orb {
+            position: absolute;
+            border-radius: 50%;
+            top: 50%;
+            left: 50%;
+            animation: spin linear infinite;
+        }
+
+        .orb1 {
+            width: 186px;
+            height: 186px;
+            margin: -93px 0 0 -93px;
+            border: 1px solid rgba(0, 200, 255, 0.35);
+            animation-duration: 6s;
+        }
+
+        .orb2 {
+            width: 214px;
+            height: 214px;
+            margin: -107px 0 0 -107px;
+            border: 1px solid rgba(28, 105, 212, 0.25);
+            animation-duration: 10s;
+            animation-direction: reverse;
+        }
+
+        .orb3 {
+            width: 244px;
+            height: 244px;
+            margin: -122px 0 0 -122px;
+            border: 1px solid rgba(28, 105, 212, 0.12);
+            animation-duration: 18s;
+        }
+
+        @keyframes spin {
+            to {
+                transform: rotate(360deg);
+            }
+        }
+
+        .orb-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            position: absolute;
+            top: -4px;
+            left: 50%;
+            margin-left: -4px;
+            background: var(--cyan);
+            box-shadow: 0 0 16px var(--cyan), 0 0 32px rgba(0, 200, 255, 0.5);
+        }
+
+        /* Intro text */
+        .intro-eyebrow {
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 7px;
+            color: var(--cyan);
+            text-transform: uppercase;
+            opacity: 0;
+            animation: rise .8s ease forwards 1.5s;
+            margin-bottom: 10px;
+        }
+
+        .intro-headline {
+            font-family: 'Orbitron', monospace;
+            font-size: clamp(28px, 5vw, 56px);
+            font-weight: 900;
+            letter-spacing: 6px;
+            text-align: center;
+            opacity: 0;
+            animation: rise .8s ease forwards 1.8s;
+            line-height: 1;
+            background: linear-gradient(135deg, #fff 0%, var(--cyan) 40%, var(--blue) 70%, #fff 100%);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+            background-size: 200% 200%;
+            animation: rise .8s ease forwards 1.8s, shimmer 6s linear infinite 2.6s;
+        }
+
+        @keyframes shimmer {
+            0% {
+                background-position: 0% 50%
+            }
+
+            100% {
+                background-position: 200% 50%
+            }
+        }
+
+        .intro-sub {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 14px;
+            font-weight: 400;
+            letter-spacing: 4px;
+            color: rgba(168, 180, 200, 0.7);
+            text-transform: uppercase;
+            opacity: 0;
+            animation: rise .8s ease forwards 2.1s;
+            margin-top: 8px;
+            text-align: center;
+        }
+
+        @keyframes rise {
+            from {
+                opacity: 0;
+                transform: translateY(20px);
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0);
+            }
+        }
+
+        /* Launch button */
+        .launch-btn {
+            margin-top: 36px;
+            opacity: 0;
+            animation: rise .8s ease forwards 2.4s;
+            position: relative;
+            font-family: 'Orbitron', monospace;
+            font-size: 13px;
+            font-weight: 700;
+            letter-spacing: 7px;
+            text-transform: uppercase;
+            padding: 18px 70px;
+            background: transparent;
+            border: none;
+            color: white;
+            cursor: none;
+            overflow: hidden;
+        }
+
+        .launch-btn::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(0, 200, 255, 0.08), rgba(28, 105, 212, 0.15));
+            border: 1px solid rgba(0, 200, 255, 0.5);
+            clip-path: polygon(14px 0%, 100% 0%, calc(100% - 14px) 100%, 0% 100%);
+            transition: all .3s ease;
+        }
+
+        .launch-btn::after {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, var(--cyan), var(--blue));
+            clip-path: polygon(14px 0%, 100% 0%, calc(100% - 14px) 100%, 0% 100%);
+            opacity: 0;
+            transition: opacity .3s ease;
+        }
+
+        .launch-btn span {
+            position: relative;
+            z-index: 1;
+        }
+
+        .launch-btn:hover::after {
+            opacity: 1;
+        }
+
+        .launch-btn:hover {
+            box-shadow: 0 0 50px rgba(0, 200, 255, 0.4);
+        }
+
+        /* Made by */
+        .made-by {
+            position: absolute;
+            bottom: 28px;
+            right: 32px;
+            opacity: 0;
+            animation: rise .8s ease forwards 3s;
+            display: flex;
+            align-items: flex-end;
+            flex-direction: column;
+            gap: 3px;
+        }
+
+        .made-by-label {
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 3px;
+            color: rgba(168, 180, 200, 0.35);
+            text-transform: uppercase;
+        }
+
+        .made-by-name {
+            font-family: 'Orbitron', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            letter-spacing: 2px;
+            background: linear-gradient(90deg, var(--blue), var(--cyan));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+            background-clip: text;
+        }
+
+        .made-by-bar {
+            width: 100%;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(0, 200, 255, 0.4));
+            margin-top: 2px;
+        }
+
+        /* ════════════════════════════
+   TRANSITION
+════════════════════════════ */
+        #transition {
+            position: fixed;
+            inset: 0;
+            z-index: 300;
+            background: var(--dark);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        .t-logo {
+            width: 70px;
+            height: 70px;
+            border-radius: 50%;
+            object-fit: contain;
+            animation: spin 2s linear infinite;
+            filter: drop-shadow(0 0 20px var(--blue));
+        }
+
+        .t-text {
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 5px;
+            color: var(--cyan);
+            animation: blink 1s ease-in-out infinite;
+        }
+
+        .t-bar {
+            width: 200px;
+            height: 2px;
+            background: rgba(255, 255, 255, 0.06);
+            border-radius: 1px;
+            overflow: hidden;
+            margin-top: 4px;
+        }
+
+        .t-progress {
+            height: 100%;
+            background: linear-gradient(to right, var(--blue), var(--cyan));
+            width: 0%;
+            animation: load-bar 1.4s ease forwards;
+            border-radius: 1px;
+        }
+
+        @keyframes load-bar {
+            to {
+                width: 100%;
+            }
+        }
+
+        @keyframes blink {
+            50% {
+                opacity: 0.2;
+            }
+        }
+
+        /* ════════════════════════════
+   APP SHELL
+════════════════════════════ */
+        #app {
+            display: none;
+            height: 100vh;
+            flex-direction: column;
+            overflow: hidden;
+            position: relative;
+            z-index: 10;
+        }
+
+        /* ── HEADER ── */
+        .hdr {
+            display: flex;
+            align-items: center;
+            padding: 0 28px;
+            height: 58px;
+            flex-shrink: 0;
+            background: rgba(3, 4, 10, 0.9);
+            backdrop-filter: blur(20px);
+            border-bottom: 1px solid rgba(0, 200, 255, 0.12);
+            position: relative;
+            gap: 18px;
+        }
+
+        .hdr::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(to right, transparent, var(--cyan), var(--blue), transparent);
+            opacity: 0.5;
+        }
+
+        .hdr-logo {
+            width: 40px;
+            height: 40px;
+            border-radius: 50%;
+            object-fit: contain;
+            filter: drop-shadow(0 0 10px rgba(28, 105, 212, 0.8));
+            flex-shrink: 0;
+        }
+
+        .hdr-brand {
+            font-family: 'Orbitron', monospace;
+            font-size: 17px;
+            font-weight: 900;
+            letter-spacing: 4px;
+        }
+
+        .hdr-brand span {
+            color: var(--cyan);
+        }
+
+        .hdr-tagline {
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 3px;
+            color: rgba(168, 180, 200, 0.5);
+            margin-top: 2px;
+            display: block;
+        }
+
+        .hdr-divider {
+            width: 1px;
+            height: 30px;
+            background: rgba(0, 200, 255, 0.15);
+        }
+
+        .hdr-pills {
+            display: flex;
+            gap: 16px;
+        }
+
+        .hdr-pill {
+            text-align: center;
+        }
+
+        .hdr-pill-val {
+            font-family: 'Orbitron', monospace;
+            font-size: 16px;
+            font-weight: 700;
+            color: var(--cyan);
+            line-height: 1;
+        }
+
+        .hdr-pill-lbl {
+            font-family: 'Space Mono', monospace;
+            font-size: 8px;
+            letter-spacing: 2px;
+            color: var(--silver);
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .hdr-right {
+            margin-left: auto;
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .live-dot {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: var(--cyan);
+            box-shadow: 0 0 8px var(--cyan);
+            animation: blink .8s ease-in-out infinite;
+        }
+
+        .live-text {
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 2px;
+            color: rgba(0, 200, 255, 0.6);
+        }
+
+        /* ── BODY ── */
+        .body {
+            display: flex;
+            flex: 1;
+            overflow: hidden;
+        }
+
+        /* ── SIDEBAR ── */
+        .sidebar {
+            width: 280px;
+            flex-shrink: 0;
+            background: rgba(5, 7, 16, 0.97);
+            border-right: 1px solid rgba(0, 200, 255, 0.08);
+            overflow-y: auto;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 200, 255, 0.3) transparent;
+        }
+
+        .sidebar::-webkit-scrollbar {
+            width: 3px;
+        }
+
+        .sidebar::-webkit-scrollbar-thumb {
+            background: rgba(0, 200, 255, 0.3);
+        }
+
+        .sb-section {
+            padding: 0 16px 16px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+        }
+
+        .sb-label {
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 4px;
+            color: rgba(0, 200, 255, 0.5);
+            text-transform: uppercase;
+            padding: 14px 0 10px;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .sb-label::after {
+            content: '';
+            flex: 1;
+            height: 1px;
+            background: linear-gradient(to right, rgba(0, 200, 255, 0.2), transparent);
+        }
+
+        /* Model cards */
+        .model-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 6px;
+        }
+
+        .mc {
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 6px;
+            overflow: hidden;
+            cursor: none;
+            transition: all .25s ease;
+            background: rgba(255, 255, 255, 0.02);
+            position: relative;
+        }
+
+        .mc::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            background: linear-gradient(135deg, rgba(0, 200, 255, 0.08), transparent);
+            opacity: 0;
+            transition: opacity .3s;
+            z-index: 1;
+        }
+
+        .mc:hover::before,
+        .mc.active::before {
+            opacity: 1;
+        }
+
+        .mc.active {
+            border-color: rgba(0, 200, 255, 0.6);
+            box-shadow: 0 0 20px rgba(0, 200, 255, 0.2), inset 0 0 20px rgba(0, 200, 255, 0.05);
+        }
+
+        .mc:hover:not(.active) {
+            border-color: rgba(0, 200, 255, 0.25);
+            transform: translateY(-1px);
+        }
+
+        .mc-img {
+            width: 100%;
+            height: 52px;
+            object-fit: cover;
+            object-position: center 55%;
+            filter: brightness(0.7) saturate(0.7);
+            transition: all .3s;
+            display: block;
+        }
+
+        .mc.active .mc-img,
+        .mc:hover .mc-img {
+            filter: brightness(0.95) saturate(1);
+        }
+
+        .mc-info {
+            padding: 6px 8px 7px;
+            position: relative;
+            z-index: 2;
+        }
+
+        .mc-name {
+            font-family: 'Orbitron', monospace;
+            font-size: 10px;
+            font-weight: 700;
+            letter-spacing: 1px;
+            color: white;
+        }
+
+        .mc.active .mc-name {
+            color: var(--cyan);
+        }
+
+        .mc-stat {
+            font-family: 'Space Mono', monospace;
+            font-size: 8px;
+            color: rgba(168, 180, 200, 0.5);
+            margin-top: 2px;
+        }
+
+        /* Chips */
+        .chips {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+        }
+
+        .chip {
+            font-family: 'Rajdhani', sans-serif;
+            font-size: 11px;
+            font-weight: 600;
+            letter-spacing: 1.5px;
+            padding: 5px 12px;
+            border: 1px solid rgba(255, 255, 255, 0.08);
+            border-radius: 2px;
+            cursor: none;
+            color: rgba(168, 180, 200, 0.6);
+            transition: all .2s;
+            clip-path: polygon(5px 0%, 100% 0%, calc(100% - 5px) 100%, 0% 100%);
+            text-transform: uppercase;
+        }
+
+        .chip.on {
+            background: rgba(0, 200, 255, 0.12);
+            border-color: rgba(0, 200, 255, 0.5);
+            color: var(--cyan);
+            box-shadow: 0 0 12px rgba(0, 200, 255, 0.15);
+        }
+
+        .chip:hover:not(.on) {
+            border-color: rgba(255, 255, 255, 0.2);
+            color: white;
+        }
+
+        /* Color swatches */
+        .swatches {
+            display: flex;
+            gap: 8px;
+            flex-wrap: wrap;
+        }
+
+        .swatch {
+            width: 20px;
+            height: 20px;
+            border-radius: 50%;
+            cursor: none;
+            border: 2px solid rgba(255, 255, 255, 0.1);
+            transition: all .2s;
+            position: relative;
+        }
+
+        .swatch.on {
+            border-color: white;
+            box-shadow: 0 0 12px rgba(255, 255, 255, 0.4);
+            transform: scale(1.3);
+        }
+
+        .swatch:hover:not(.on) {
+            transform: scale(1.15);
+            border-color: rgba(255, 255, 255, 0.3);
+        }
+
+        /* Year inputs */
+        .year-row {
+            display: flex;
+            gap: 8px;
+            align-items: center;
+        }
+
+        .yr {
+            width: 68px;
+            background: rgba(255, 255, 255, 0.04);
+            border: 1px solid rgba(0, 200, 255, 0.2);
+            border-radius: 3px;
+            padding: 7px 8px;
+            color: white;
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            text-align: center;
+        }
+
+        .yr:focus {
+            outline: none;
+            border-color: var(--cyan);
+            box-shadow: 0 0 12px rgba(0, 200, 255, 0.2);
+        }
+
+        .yr-sep {
+            color: var(--silver);
+            font-size: 11px;
+        }
+
+        .apply-btn {
+            width: 100%;
+            margin-top: 14px;
+            padding: 12px;
+            cursor: none;
+            background: linear-gradient(135deg, var(--blue2), var(--blue));
+            border: 1px solid rgba(0, 200, 255, 0.3);
+            color: white;
+            font-family: 'Orbitron', monospace;
+            font-size: 10px;
+            letter-spacing: 5px;
+            text-transform: uppercase;
+            transition: all .25s;
+            clip-path: polygon(10px 0%, 100% 0%, calc(100% - 10px) 100%, 0% 100%);
+        }
+
+        .apply-btn:hover {
+            background: linear-gradient(135deg, var(--blue), var(--cyan));
+            box-shadow: 0 0 30px rgba(0, 200, 255, 0.3);
+        }
+
+        .reset-btn {
+            width: 100%;
+            margin-top: 6px;
+            padding: 8px;
+            cursor: none;
+            background: transparent;
+            border: 1px solid rgba(255, 60, 60, 0.2);
+            color: rgba(255, 100, 100, 0.6);
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 2px;
+            transition: all .2s;
+            text-transform: uppercase;
+        }
+
+        .reset-btn:hover {
+            border-color: rgba(255, 60, 60, 0.5);
+            color: #ff6060;
+            background: rgba(255, 60, 60, 0.05);
+        }
+
+        /* ── MAIN ── */
+        .main {
+            flex: 1;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(28, 105, 212, 0.4) transparent;
+            background: radial-gradient(ellipse 100% 60% at 70% 0%, rgba(28, 105, 212, 0.06) 0%, transparent 70%),
+                var(--dark);
+        }
+
+        .main::-webkit-scrollbar {
+            width: 3px;
+        }
+
+        .main::-webkit-scrollbar-thumb {
+            background: rgba(28, 105, 212, 0.4);
+        }
+
+        /* ── NO SELECTION ── */
+        .no-sel {
+            height: 100%;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            gap: 16px;
+            opacity: 0.25;
+        }
+
+        .no-sel-logo {
+            width: 80px;
+            height: 80px;
+            border-radius: 50%;
+            object-fit: contain;
+            animation: spin 20s linear infinite;
+        }
+
+        .no-sel-txt {
+            font-family: 'Orbitron', monospace;
+            font-size: 13px;
+            letter-spacing: 4px;
+            color: var(--silver);
+        }
+
+        /* ── HERO SHOWCASE ── */
+        .hero {
+            position: relative;
+            height: 260px;
+            overflow: hidden;
+            flex-shrink: 0;
+            background: linear-gradient(135deg, rgba(3, 10, 24, 0.95) 0%, rgba(5, 10, 20, 0.9) 100%);
+        }
+
+        /* Grid bg */
+        .hero-grid {
+            position: absolute;
+            inset: 0;
+            z-index: 0;
+            background-image: linear-gradient(rgba(0, 200, 255, 0.04) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(0, 200, 255, 0.04) 1px, transparent 1px);
+            background-size: 50px 50px;
+            animation: grid-drift 25s linear infinite;
+        }
+
+        @keyframes grid-drift {
+            from {
+                background-position: 0 0
+            }
+
+            to {
+                background-position: 50px 50px
+            }
+        }
+
+        /* Diagonal light beam */
+        .hero-beam {
+            position: absolute;
+            top: 0;
+            right: 20%;
+            width: 300px;
+            height: 100%;
+            background: linear-gradient(105deg, transparent 40%, rgba(28, 105, 212, 0.06) 50%, transparent 60%);
+            animation: beam-sweep 8s ease-in-out infinite;
+        }
+
+        @keyframes beam-sweep {
+
+            0%,
+            100% {
+                transform: translateX(0) skewX(-10deg)
+            }
+
+            50% {
+                transform: translateX(80px) skewX(-10deg)
+            }
+        }
+
+        /* Car image */
+        .hero-car {
+            position: absolute;
+            right: 0;
+            bottom: 0;
+            top: 0;
+            width: 62%;
+            object-fit: cover;
+            object-position: center 45%;
+            opacity: 0;
+            transform: translateX(60px) scale(1.04);
+            transition: opacity .9s cubic-bezier(.16, 1, .3, 1), transform .9s cubic-bezier(.16, 1, .3, 1);
+            mask-image: linear-gradient(to left, rgba(0, 0, 0, .95) 50%, transparent 95%);
+            -webkit-mask-image: linear-gradient(to left, rgba(0, 0, 0, .95) 50%, transparent 95%);
+            filter: brightness(0.95) contrast(1.05) saturate(1.1);
+            z-index: 1;
+        }
+
+        .hero-car.on {
+            opacity: 1;
+            transform: translateX(0) scale(1);
+        }
+
+        /* Reflection */
+        .hero-car-ref {
+            position: absolute;
+            right: 0;
+            bottom: -30px;
+            top: auto;
+            width: 62%;
+            height: 60px;
+            object-fit: cover;
+            object-position: center 45%;
+            opacity: 0;
+            transform: translateX(60px) scaleY(-1);
+            transition: opacity .9s .1s, transform .9s .1s;
+            filter: blur(8px) brightness(0.25);
+            mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
+            -webkit-mask-image: linear-gradient(to bottom, rgba(0, 0, 0, 0.6), transparent);
+            z-index: 1;
+        }
+
+        .hero-car-ref.on {
+            opacity: 1;
+            transform: translateX(0) scaleY(-1);
+        }
+
+        /* Ground line */
+        .hero-ground {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            z-index: 2;
+            background: linear-gradient(to right, transparent, rgba(0, 200, 255, 0.4), rgba(28, 105, 212, 0.6), rgba(0, 200, 255, 0.4), transparent);
+            animation: ground-pulse 3s ease-in-out infinite;
+        }
+
+        @keyframes ground-pulse {
+
+            0%,
+            100% {
+                opacity: 0.5
+            }
+
+            50% {
+                opacity: 1
+            }
+        }
+
+        .hero-glow {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 80px;
+            z-index: 1;
+            background: linear-gradient(to top, rgba(0, 200, 255, 0.06), transparent);
+        }
+
+        /* Hero text overlay */
+        .hero-text {
+            position: absolute;
+            left: 0;
+            top: 0;
+            bottom: 0;
+            width: 55%;
+            z-index: 3;
+            padding: 30px 36px;
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+        }
+
+        .hero-model {
+            font-family: 'Orbitron', monospace;
+            font-size: clamp(28px, 3.5vw, 44px);
+            font-weight: 900;
+            color: white;
+            line-height: 1;
+            letter-spacing: 2px;
+        }
+
+        .hero-series {
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 4px;
+            color: var(--cyan);
+            text-transform: uppercase;
+            margin-top: 6px;
+        }
+
+        .hero-stats {
+            display: flex;
+            gap: 12px;
+            margin-top: 18px;
+            flex-wrap: wrap;
+        }
+
+        .hstat {
+            background: rgba(0, 0, 0, 0.5);
+            border: 1px solid rgba(0, 200, 255, 0.2);
+            padding: 8px 14px;
+            backdrop-filter: blur(10px);
+            border-radius: 2px;
+        }
+
+        .hstat-v {
+            font-family: 'Orbitron', monospace;
+            font-size: 15px;
+            font-weight: 700;
+            color: var(--cyan);
+            line-height: 1;
+        }
+
+        .hstat-l {
+            font-family: 'Space Mono', monospace;
+            font-size: 8px;
+            letter-spacing: 2px;
+            color: rgba(168, 180, 200, 0.6);
+            text-transform: uppercase;
+            margin-top: 3px;
+        }
+
+        /* ── DASHBOARD GRID ── */
+        .dash {
+            padding: 16px 20px 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        /* KPI strip */
+        .kpi-strip {
+            display: grid;
+            grid-template-columns: repeat(4, 1fr);
+            gap: 10px;
+        }
+
+        .kpi {
+            background: rgba(8, 12, 24, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 4px;
+            padding: 14px 16px;
+            position: relative;
+            overflow: hidden;
+            animation: pop .4s ease forwards;
+            opacity: 0;
+        }
+
+        .kpi::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(to right, var(--blue), var(--cyan));
+        }
+
+        .kpi-v {
+            font-family: 'Orbitron', monospace;
+            font-size: 20px;
+            font-weight: 700;
+            color: white;
+            line-height: 1;
+            margin-bottom: 5px;
+        }
+
+        .kpi-v.c {
+            color: var(--cyan);
+        }
+
+        .kpi-l {
+            font-family: 'Space Mono', monospace;
+            font-size: 8px;
+            letter-spacing: 2px;
+            color: var(--silver);
+            text-transform: uppercase;
+            opacity: 0.65;
+        }
+
+        @keyframes pop {
+            from {
+                opacity: 0;
+                transform: translateY(12px)
+            }
+
+            to {
+                opacity: 1;
+                transform: translateY(0)
+            }
+        }
+
+        /* Charts row */
+        .charts-row {
+            display: grid;
+            grid-template-columns: 2fr 1fr 1fr;
+            gap: 14px;
+        }
+
+        .chart-box {
+            background: rgba(8, 12, 24, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 4px;
+            padding: 16px;
+            position: relative;
+            overflow: hidden;
+            animation: pop .4s ease forwards;
+            opacity: 0;
+        }
+
+        .chart-box::after {
+            content: '';
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            height: 1px;
+            background: linear-gradient(to right, transparent, rgba(0, 200, 255, 0.3), transparent);
+        }
+
+        .chart-hd {
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 3px;
+            color: var(--cyan);
+            text-transform: uppercase;
+            margin-bottom: 14px;
+        }
+
+        .chart-wrap {
+            height: 180px;
+            position: relative;
+        }
+
+        /* ── CAR GALLERY ── */
+        .gallery-section {
+            animation: pop .4s ease forwards .5s;
+            opacity: 0;
+            background: rgba(8, 12, 24, 0.8);
+            border: 1px solid rgba(255, 255, 255, 0.06);
+            border-radius: 4px;
+            overflow: hidden;
+            position: relative;
+        }
+
+        .gallery-section::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            background: linear-gradient(to right, var(--cyan), var(--blue), var(--cyan));
+            animation: border-slide 4s linear infinite;
+        }
+
+        @keyframes border-slide {
+            0% {
+                background-position: 0% 0%
+            }
+
+            100% {
+                background-position: 200% 0%
+            }
+        }
+
+        .gallery-hdr {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 14px 20px;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+        }
+
+        .gallery-hdr-title {
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 4px;
+            color: var(--cyan);
+            text-transform: uppercase;
+        }
+
+        .gallery-hdr-count {
+            font-family: 'Orbitron', monospace;
+            font-size: 11px;
+            background: rgba(0, 200, 255, 0.1);
+            border: 1px solid rgba(0, 200, 255, 0.3);
+            color: var(--cyan);
+            padding: 3px 12px;
+            border-radius: 2px;
+            letter-spacing: 2px;
+        }
+
+        /* The actual gallery grid - 2 rows, scrollable horizontally */
+        .gallery-track {
+            display: flex;
+            gap: 0;
+            overflow-x: auto;
+            padding: 0;
+            scrollbar-width: thin;
+            scrollbar-color: rgba(0, 200, 255, 0.3) transparent;
+        }
+
+        .gallery-track::-webkit-scrollbar {
+            height: 3px;
+        }
+
+        .gallery-track::-webkit-scrollbar-thumb {
+            background: rgba(0, 200, 255, 0.3);
+        }
+
+        /* Each car card in gallery */
+        .gcard {
+            flex-shrink: 0;
+            width: 200px;
+            height: 170px;
+            position: relative;
+            overflow: hidden;
+            cursor: none;
+            border-right: 1px solid rgba(255, 255, 255, 0.05);
+            transition: all .3s ease;
+        }
+
+        .gcard:last-child {
+            border-right: none;
+        }
+
+        .gcard.featured {
+            width: 240px;
+        }
+
+        .gcard img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover;
+            object-position: center 50%;
+            transition: transform .6s ease, filter .4s ease;
+            filter: brightness(0.65) saturate(0.8);
+        }
+
+        .gcard:hover img {
+            transform: scale(1.1);
+            filter: brightness(0.9) saturate(1.2);
+        }
+
+        .gcard.featured img {
+            filter: brightness(0.8) saturate(1);
+        }
+
+        /* Gradient overlay */
+        .gcard::before {
+            content: '';
+            position: absolute;
+            inset: 0;
+            z-index: 1;
+            background: linear-gradient(to top, rgba(3, 4, 10, 0.92) 0%, rgba(3, 4, 10, 0.2) 50%, transparent 100%);
+            transition: opacity .3s;
+        }
+
+        .gcard:hover::before {
+            opacity: 0.7;
+        }
+
+        /* Top accent bar */
+        .gcard::after {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 2px;
+            z-index: 3;
+            background: linear-gradient(to right, var(--cyan), var(--blue));
+            transform: scaleX(0);
+            transform-origin: left;
+            transition: transform .4s ease;
+        }
+
+        .gcard:hover::after,
+        .gcard.featured::after {
+            transform: scaleX(1);
+        }
+
+        .gcard-body {
+            position: absolute;
+            bottom: 0;
+            left: 0;
+            right: 0;
+            z-index: 2;
+            padding: 12px 14px;
+        }
+
+        .gcard-name {
+            font-family: 'Orbitron', monospace;
+            font-size: 12px;
+            font-weight: 700;
+            color: white;
+            letter-spacing: 1px;
+        }
+
+        .gcard.featured .gcard-name {
+            color: var(--cyan);
+        }
+
+        .gcard-type {
+            font-family: 'Space Mono', monospace;
+            font-size: 9px;
+            letter-spacing: 2px;
+            color: rgba(168, 180, 200, 0.6);
+            text-transform: uppercase;
+            margin-top: 2px;
+        }
+
+        .gcard-tag {
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            margin-top: 6px;
+            background: rgba(0, 200, 255, 0.12);
+            border: 1px solid rgba(0, 200, 255, 0.25);
+            padding: 3px 8px;
+            border-radius: 1px;
+        }
+
+        .gcard-tag-txt {
+            font-family: 'Space Mono', monospace;
+            font-size: 8px;
+            color: var(--cyan);
+            letter-spacing: 1px;
+        }
+
+        /* Featured badge */
+        .featured-badge {
+            position: absolute;
+            top: 10px;
+            left: 10px;
+            z-index: 3;
+            background: linear-gradient(135deg, var(--blue), var(--cyan));
+            font-family: 'Space Mono', monospace;
+            font-size: 8px;
+            letter-spacing: 2px;
+            color: black;
+            font-weight: 700;
+            padding: 3px 8px;
+            text-transform: uppercase;
+            clip-path: polygon(4px 0%, 100% 0%, calc(100% - 4px) 100%, 0% 100%);
+        }
+
+        /* ── LIGHTBOX ── */
+        #lb {
+            position: fixed;
+            inset: 0;
+            z-index: 1000;
+            background: rgba(0, 0, 0, 0.95);
+            backdrop-filter: blur(16px);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            flex-direction: column;
+            gap: 20px;
+        }
+
+        #lb.show {
+            display: flex;
+        }
+
+        #lb-img {
+            max-width: 88vw;
+            max-height: 70vh;
+            border-radius: 4px;
+            border: 1px solid rgba(0, 200, 255, 0.3);
+            box-shadow: 0 0 80px rgba(0, 200, 255, 0.25), 0 0 160px rgba(28, 105, 212, 0.2);
+            animation: lb-in .4s cubic-bezier(.16, 1, .3, 1) forwards;
+        }
+
+        @keyframes lb-in {
+            from {
+                opacity: 0;
+                transform: scale(.9)
+            }
+
+            to {
+                opacity: 1;
+                transform: scale(1)
+            }
+        }
+
+        #lb-model {
+            font-family: 'Orbitron', monospace;
+            font-size: 22px;
+            font-weight: 900;
+            color: white;
+            letter-spacing: 3px;
+        }
+
+        #lb-series {
+            font-family: 'Space Mono', monospace;
+            font-size: 11px;
+            letter-spacing: 4px;
+            color: var(--cyan);
+        }
+
+        #lb-close {
+            position: absolute;
+            top: 24px;
+            right: 28px;
+            font-family: 'Space Mono', monospace;
+            font-size: 10px;
+            letter-spacing: 3px;
+            color: rgba(168, 180, 200, 0.5);
+            cursor: none;
+            padding: 8px 16px;
+            border: 1px solid rgba(168, 180, 200, 0.15);
+            border-radius: 2px;
+            transition: all .2s;
+        }
+
+        #lb-close:hover {
+            color: white;
+            border-color: rgba(255, 255, 255, 0.4);
+        }
+    </style>
+</head>
+
+<body>
+
+    <!-- Custom cursor -->
+    <div id="cursor"></div>
+    <div id="cursor-ring"></div>
+
+    <!-- Canvas background -->
+    <canvas id="bg-canvas"></canvas>
+    <div class="scanlines"></div>
+
+    <!-- ════ INTRO ════ -->
+    <div id="intro">
+        <div class="corner tl"></div>
+        <div class="corner tr"></div>
+        <div class="corner bl"></div>
+        <div class="corner br"></div>
+        <div class="speed-lines" id="speed-lines"></div>
+
+        <!-- Background car silhouette -->
+        <img class="intro-bg-car"
+            src="https://upload.wikimedia.org/wikipedia/commons/thumb/3/3e/2018_BMW_i8_Coupe%2C_front_8.10.18.jpg/1280px-2018_BMW_i8_Coupe%2C_front_8.10.18.jpg"
+            alt="" onerror="this.style.display='none'">
+
+        <div class="logo-stage">
+            <div class="orb orb1">
+                <div class="orb-dot"></div>
+            </div>
+            <div class="orb orb2">
+                <div class="orb-dot"></div>
+            </div>
+            <div class="orb orb3">
+                <div class="orb-dot"></div>
+            </div>
+            <img class="intro-logo-img" src="https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg" alt="BMW"
+                onerror="this.onerror=null;this.src='https://www.carlogos.org/car-logos/bmw-logo-2020-grey-show.png'">
+        </div>
+
+        <div style="text-align:center;position:relative;z-index:2">
+            <div class="intro-eyebrow">Sheer Driving Pleasure</div>
+            <div class="intro-headline">BMW · INTELLIGENCE</div>
+            <div class="intro-sub">Sales Data Explorer &nbsp;·&nbsp; 2010 – 2024</div>
+        </div>
+
+        <button class="launch-btn" onclick="startApp()"><span>▶ &nbsp; LAUNCH EXPERIENCE</span></button>
+
+        <div class="made-by">
+            <div class="made-by-label">Professionally crafted by</div>
+            <div class="made-by-name">PUNEETH RAM</div>
+            <div class="made-by-bar"></div>
+        </div>
+    </div>
+
+    <!-- ════ TRANSITION ════ -->
+    <div id="transition">
+        <img class="t-logo" src="https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg" alt="BMW"
+            onerror="this.onerror=null;this.src='https://www.carlogos.org/car-logos/bmw-logo-2020-grey-show.png'">
+        <div class="t-text">LOADING INTELLIGENCE</div>
+        <div class="t-bar">
+            <div class="t-progress"></div>
+        </div>
+    </div>
+
+    <!-- ════ APP ════ -->
+    <div id="app">
+        <!-- Header -->
+        <header class="hdr">
+            <img class="hdr-logo" src="https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg" alt="BMW"
+                onerror="this.onerror=null;this.src='https://www.carlogos.org/car-logos/bmw-logo-2020-grey-show.png'">
+            <div>
+                <div class="hdr-brand">BM<span>W</span> INTELLIGENCE</div>
+                <span class="hdr-tagline">Sales Data Explorer · 2010–2024</span>
+            </div>
+            <div class="hdr-divider"></div>
+            <div class="hdr-pills">
+                <div class="hdr-pill">
+                    <div class="hdr-pill-val">50K</div>
+                    <div class="hdr-pill-lbl">Records</div>
+                </div>
+                <div class="hdr-pill">
+                    <div class="hdr-pill-val" style="color:white">11</div>
+                    <div class="hdr-pill-lbl">Models</div>
+                </div>
+                <div class="hdr-pill">
+                    <div class="hdr-pill-val">254M+</div>
+                    <div class="hdr-pill-lbl">Sales</div>
+                </div>
+            </div>
+            <div class="hdr-right">
+                <div class="live-dot"></div>
+                <div class="live-text">LIVE DASHBOARD</div>
+            </div>
+        </header>
+
+        <div class="body">
+            <!-- Sidebar -->
+            <aside class="sidebar">
+                <div class="sb-section">
+                    <div class="sb-label">Select Model</div>
+                    <div class="model-grid" id="model-grid"></div>
+                </div>
+                <div class="sb-section">
+                    <div class="sb-label">Region</div>
+                    <div class="chips" id="region-chips"></div>
+                </div>
+                <div class="sb-section">
+                    <div class="sb-label">Fuel Type</div>
+                    <div class="chips" id="fuel-chips"></div>
+                </div>
+                <div class="sb-section">
+                    <div class="sb-label">Transmission</div>
+                    <div class="chips" id="trans-chips"></div>
+                </div>
+                <div class="sb-section">
+                    <div class="sb-label">Color</div>
+                    <div class="swatches" id="swatches"></div>
+                </div>
+                <div class="sb-section">
+                    <div class="sb-label">Year Range</div>
+                    <div class="year-row">
+                        <input class="yr" type="number" id="yr-from" value="2010" min="2010" max="2024">
+                        <span class="yr-sep">—</span>
+                        <input class="yr" type="number" id="yr-to" value="2024" min="2010" max="2024">
+                    </div>
+                    <button class="apply-btn" onclick="applyFilters()">Apply Filters</button>
+                    <button class="reset-btn" onclick="resetAll()">Reset All</button>
+                </div>
+            </aside>
+
+            <!-- Main area -->
+            <main class="main" id="main">
+                <!-- No selection state -->
+                <div class="no-sel" id="no-sel">
+                    <img class="no-sel-logo" src="https://upload.wikimedia.org/wikipedia/commons/4/44/BMW.svg" alt=""
+                        onerror="this.onerror=null;this.src='https://www.carlogos.org/car-logos/bmw-logo-2020-grey-show.png'">
+                    <div class="no-sel-txt">Select a model to begin</div>
+                </div>
+                <!-- Dashboard injected here -->
+                <div id="dash" style="display:none"></div>
+            </main>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div id="lb" onclick="closeLb()">
+        <div id="lb-close" onclick="closeLb()">✕ &nbsp;CLOSE</div>
+        <img id="lb-img" src="" alt="">
+        <div id="lb-model"></div>
+        <div id="lb-series"></div>
+    </div>
+
+    <script>
+        /* ════ DATA ════ */
+        const DATA = { "by_model_year": { "5 Series|2016": 1677865, "i8|2013": 1613761, "5 Series|2022": 1588961, "X3|2024": 1664449, "7 Series|2020": 1543614, "5 Series|2017": 1631893, "i8|2022": 1592647, "M5|2014": 1339192, "X3|2016": 1657972, "i8|2019": 1485386, "3 Series|2012": 1378152, "i8|2016": 1650583, "5 Series|2020": 1529725, "X1|2017": 1415270, "M3|2014": 1606468, "X5|2013": 1471064, "M5|2017": 1500767, "X5|2012": 1500173, "X3|2015": 1417693, "X1|2014": 1624913, "M5|2011": 1585291, "7 Series|2017": 1763339, "X5|2021": 1427546, "X3|2023": 1534907, "M3|2015": 1549374, "X1|2011": 1694495, "M5|2021": 1689063, "i8|2010": 1626565, "i8|2021": 1471816, "M5|2019": 1664560, "i8|2015": 1653077, "X1|2022": 1548116, "X3|2018": 1393935, "M3|2020": 1454349, "X5|2020": 1481542, "i3|2024": 1621427, "X5|2024": 1458678, "i8|2023": 1537056, "i3|2023": 1372618, "5 Series|2024": 1711580, "X6|2023": 1556438, "i3|2012": 1752148, "X3|2021": 1484470, "M3|2016": 1490676, "i3|2018": 1352709, "i8|2012": 1608873, "X6|2016": 1323705, "3 Series|2018": 1620038, "X6|2011": 1439191, "X6|2018": 1485429, "3 Series|2021": 1579384, "3 Series|2023": 1510756, "M3|2011": 1371503, "X3|2019": 1482528, "7 Series|2018": 1552221, "3 Series|2019": 1459935, "X6|2014": 1548954, "5 Series|2011": 1552268, "7 Series|2013": 1519285, "i3|2021": 1632289, "X1|2024": 1493734, "X1|2016": 1574498, "X3|2022": 1607566, "M3|2017": 1474399, "M5|2024": 1632996, "7 Series|2012": 1528381, "7 Series|2023": 1583848, "X6|2010": 1450874, "X6|2013": 1505165, "i8|2011": 1548054, "X5|2015": 1477242, "i3|2013": 1495614, "i3|2015": 1628045, "X6|2022": 1701699, "X5|2019": 1670497, "X1|2021": 1510193, "3 Series|2011": 1473102, "M5|2013": 1617984, "X1|2023": 1457295, "7 Series|2024": 1686209, "i8|2017": 1505168, "7 Series|2016": 1466641, "i8|2018": 1623682, "3 Series|2024": 1511560, "X5|2017": 1499761, "5 Series|2021": 1355597, "7 Series|2022": 1739216, "X5|2018": 1497265, "M3|2022": 1690554, "X6|2024": 1836396, "5 Series|2018": 1399758, "X5|2016": 1523981, "7 Series|2021": 1624555, "X6|2017": 1368799, "i3|2020": 1384260, "M5|2012": 1344079, "M5|2010": 1594989, "i3|2017": 1502611, "3 Series|2010": 1647769, "3 Series|2020": 1537651, "5 Series|2019": 1600027, "i3|2016": 1607308, "M3|2021": 1547692, "5 Series|2010": 1501229, "M5|2023": 1463354, "3 Series|2017": 1497382, "X3|2014": 1444087, "5 Series|2012": 1536071, "i3|2010": 1619401, "X3|2012": 1643501, "X5|2023": 1284529, "X1|2012": 1671189, "M5|2016": 1272223, "X6|2020": 1442646, "X5|2010": 1516004, "3 Series|2013": 1448530, "3 Series|2022": 1601902, "3 Series|2016": 1712098, "X5|2022": 1796846, "3 Series|2015": 1620499, "M3|2018": 1498085, "X6|2021": 1562061, "i8|2020": 1443078, "7 Series|2010": 1388037, "M5|2022": 1519573, "M5|2015": 1440389, "X1|2018": 1376586, "X3|2010": 1584432, "M3|2024": 1322200, "X3|2020": 1372549, "X1|2013": 1730904, "X1|2019": 1681721, "i3|2011": 1525849, "M3|2010": 1523792, "5 Series|2013": 1504123, "X1|2010": 1480353, "i3|2014": 1443118, "M5|2020": 1502663, "M3|2012": 1391655, "X3|2013": 1493613, "X5|2011": 1427955, "X1|2020": 1618766, "X6|2019": 1636973, "7 Series|2019": 1442654, "7 Series|2014": 1626299, "M3|2013": 1466690, "X3|2017": 1461422, "X1|2015": 1528027, "i3|2022": 1533866, "M3|2023": 1557168, "X6|2012": 1397673, "7 Series|2015": 1683339, "i8|2014": 1475520, "5 Series|2014": 1491198, "5 Series|2023": 1410685, "3 Series|2014": 1682545, "i8|2024": 1588625, "X3|2011": 1502405, "M3|2019": 1405089, "i3|2019": 1662586, "X5|2014": 1676666, "M5|2018": 1612565, "5 Series|2015": 1606539, "7 Series|2011": 1638828, "X6|2015": 1405983 }, "by_model_fuel": { "5 Series|Petrol": 5971944, "i8|Hybrid": 6025969, "X3|Petrol": 5584654, "7 Series|Diesel": 6092302, "5 Series|Diesel": 5574747, "i8|Diesel": 5695989, "M5|Diesel": 5295097, "X3|Diesel": 5681507, "i8|Electric": 5758878, "3 Series|Electric": 5900553, "5 Series|Electric": 5753202, "X1|Electric": 6028920, "M3|Hybrid": 5747274, "X5|Electric": 5741201, "X1|Petrol": 5758653, "M5|Electric": 5720715, "7 Series|Petrol": 5798439, "X5|Diesel": 5757666, "X3|Electric": 5671004, "X1|Hybrid": 5876739, "M5|Hybrid": 6060416, "M3|Electric": 5733556, "M5|Petrol": 5703460, "i8|Petrol": 5943055, "M3|Petrol": 5577294, "X5|Hybrid": 5458184, "i3|Petrol": 5826095, "X5|Petrol": 5752698, "X6|Hybrid": 5775905, "i3|Hybrid": 5665338, "X3|Hybrid": 5808364, "X6|Diesel": 5560446, "X6|Electric": 5492824, "3 Series|Hybrid": 6120744, "M3|Diesel": 5291570, "5 Series|Hybrid": 5797626, "7 Series|Hybrid": 6195538, "i3|Electric": 5656625, "i3|Diesel": 5985791, "X1|Diesel": 5741748, "7 Series|Electric": 5700187, "3 Series|Diesel": 5684955, "X6|Petrol": 5832811, "3 Series|Petrol": 5575051 }, "by_model_region": { "5 Series|Asia": 3935629, "i8|North America": 3987274, "5 Series|North America": 3691777, "X3|Middle East": 3745004, "7 Series|South America": 4000510, "5 Series|Middle East": 3708878, "i8|Europe": 4202401, "M5|Asia": 3928390, "X3|South America": 3699923, "3 Series|Middle East": 3889367, "7 Series|North America": 4087259, "5 Series|Africa": 4020702, "X1|Asia": 4192289, "M3|North America": 3792785, "X5|Asia": 3748736, "M5|North America": 3602546, "X5|Africa": 3972541, "X3|North America": 4056192, "X1|Africa": 3928136, "M5|Europe": 4002667, "X5|South America": 3609906, "M3|Asia": 3935579, "X1|North America": 3987029, "i8|South America": 3920908, "i8|Asia": 3975942, "X1|Middle East": 3818212, "M5|South America": 3632944, "i8|Middle East": 3750693, "M3|Africa": 3448709, "X5|Middle East": 3946209, "i3|Middle East": 3840814, "i3|North America": 3872237, "X6|Africa": 3630167, "i3|Asia": 3739218, "X3|Asia": 3796115, "i3|South America": 3760040, "X6|South America": 4023804, "M3|Europe": 3649697, "3 Series|Africa": 3892595, "M3|South America": 3690509, "X6|Middle East": 3777388, "X6|Asia": 3756074, "3 Series|North America": 3879277, "3 Series|Europe": 3959930, "7 Series|Middle East": 4080751, "3 Series|South America": 3697895, "X6|Europe": 3772519, "7 Series|Asia": 4004066, "X1|Europe": 3850033, "X3|Europe": 3705572, "i3|Africa": 3967283, "7 Series|Africa": 3699471, "7 Series|Europe": 3914409, "X3|Africa": 3742723, "M3|Middle East": 3832415, "5 Series|Europe": 3855515, "X6|North America": 3702034, "X5|Europe": 3688138, "X5|North America": 3744219, "3 Series|Asia": 3962239, "5 Series|South America": 3885018, "M5|Africa": 3676252, "X1|South America": 3630361, "i8|Africa": 3586673, "i3|Europe": 3954257, "M5|Middle East": 3936889 }, "model_meta": { "5 Series": { "avg_price": 75288, "avg_mileage": 101357, "total_sales": 23097519, "count": 4592 }, "i8": { "avg_price": 75366, "avg_mileage": 99447, "total_sales": 23423891, "count": 4606 }, "X3": { "avg_price": 75017, "avg_mileage": 100717, "total_sales": 22745529, "count": 4497 }, "7 Series": { "avg_price": 75570, "avg_mileage": 100792, "total_sales": 23786466, "count": 4666 }, "M5": { "avg_price": 74475, "avg_mileage": 102343, "total_sales": 22779688, "count": 4478 }, "3 Series": { "avg_price": 75566, "avg_mileage": 100160, "total_sales": 23281303, "count": 4595 }, "X1": { "avg_price": 75262, "avg_mileage": 100376, "total_sales": 23406060, "count": 4570 }, "M3": { "avg_price": 74842, "avg_mileage": 99730, "total_sales": 22349694, "count": 4413 }, "X5": { "avg_price": 74708, "avg_mileage": 100260, "total_sales": 22709749, "count": 4487 }, "i3": { "avg_price": 74800, "avg_mileage": 98735, "total_sales": 23133849, "count": 4618 }, "X6": { "avg_price": 74435, "avg_mileage": 99482, "total_sales": 22661986, "count": 4478 } } };
+
+        const MODELS = ["3 Series", "5 Series", "7 Series", "M3", "M5", "X1", "X3", "X5", "X6", "i3", "i8"];
+        const REGIONS = ["Africa", "Asia", "Europe", "Middle East", "North America", "South America"];
+        const FUELS = ["Diesel", "Electric", "Hybrid", "Petrol"];
+        const TRANS = ["Automatic", "Manual"];
+        const COLORS = { Black: "#111", Blue: "#2563eb", Grey: "#6b7280", Red: "#dc2626", Silver: "#d1d5db", White: "#f9fafb" };
+        const YEARS = Array.from({ length: 15 }, (_, i) => 2010 + i);
+
+        const W = "https://upload.wikimedia.org/wikipedia/commons/thumb/";
+        const IMGS = {
+            "3 Series": W + "9/96/2019_BMW_330i_M_Sport_%28F30%2C_facelift%2C_blue%29%2C_front_8.25.19.jpg/1280px-2019_BMW_330i_M_Sport_%28F30%2C_facelift%2C_blue%29%2C_front_8.25.19.jpg",
+            "5 Series": W + "0/0a/2018_BMW_530e_iPerformance_sedan_%28Australia%29%2C_front_8.11.19.jpg/1280px-2018_BMW_530e_iPerformance_sedan_%28Australia%29%2C_front_8.11.19.jpg",
+            "7 Series": W + "7/7e/BMW_7er_%28G11%29_%E2%80%93_Frontansicht%2C_15._M%C3%A4rz_2016%2C_D%C3%BCsseldorf.jpg/1280px-BMW_7er_%28G11%29_%E2%80%93_Frontansicht%2C_15._M%C3%A4rz_2016%2C_D%C3%BCsseldorf.jpg",
+            "M3": W + "6/65/2021_BMW_M3_Competition_%28G80%29_sedan_%28Australia%29%2C_front_8.23.21.jpg/1280px-2021_BMW_M3_Competition_%28G80%29_sedan_%28Australia%29%2C_front_8.23.21.jpg",
+            "M5": W + "9/9d/2018_BMW_M5_%28F90%29_saloon_%282018-11-05%29_01.jpg/1280px-2018_BMW_M5_%28F90%29_saloon_%282018-11-05%29_01.jpg",
+            "X1": W + "1/16/BMW_X1_xDrive25e_%28U11%29_%E2%80%93_Frontansicht%2C_16._Oktober_2022%2C_D%C3%BCsseldorf.jpg/1280px-BMW_X1_xDrive25e_%28U11%29_%E2%80%93_Frontansicht%2C_16._Oktober_2022%2C_D%C3%BCsseldorf.jpg",
+            "X3": W + "d/d6/2018_BMW_X3_xDrive20d_%28G01%29_SUV_%28facelift%2C_white%29%2C_front_8.10.21.jpg/1280px-2018_BMW_X3_xDrive20d_%28G01%29_SUV_%28facelift%2C_white%29%2C_front_8.10.21.jpg",
+            "X5": W + "a/a9/2019_BMW_X5_xDrive30d_%28G05%29_SUV_%28facelift%2C_Australia%29%2C_front_8.12.19.jpg/1280px-2019_BMW_X5_xDrive30d_%28G05%29_SUV_%28facelift%2C_Australia%29%2C_front_8.12.19.jpg",
+            "X6": W + "0/0e/2020_BMW_X6_xDrive40i_%28G06%29_SAC_%28Australia%29%2C_front_8.31.20.jpg/1280px-2020_BMW_X6_xDrive40i_%28G06%29_SAC_%28Australia%29%2C_front_8.31.20.jpg",
+            "i3": W + "8/81/2018_BMW_i3%2C_front_8.12.19.jpg/1280px-2018_BMW_i3%2C_front_8.12.19.jpg",
+            "i8": W + "3/3e/2018_BMW_i8_Coupe%2C_front_8.10.18.jpg/1280px-2018_BMW_i8_Coupe%2C_front_8.10.18.jpg"
+        };
+        const THUMBS = Object.fromEntries(Object.entries(IMGS).map(([k, v]) => [k, v.replace('/1280px-', '/320px-')]));
+        const LABELS = {
+            "3 Series": "Luxury Sedan", "5 Series": "Executive Sedan", "7 Series": "Flagship Sedan",
+            "M3": "M Performance Sedan", "M5": "M Performance Sedan",
+            "X1": "Compact SAV", "X3": "Mid-Size SAV", "X5": "Sports Activity Vehicle", "X6": "Sports Activity Coupé",
+            "i3": "Electric City Car", "i8": "Hybrid Supercar"
+        };
+
+        /* ════ STATE ════ */
+        let selModel = null, selR = new Set(), selF = new Set(), selT = new Set(), selC = null, yrFrom = 2010, yrTo = 2024, charts = {};
+
+        /* ════ CURSOR ════ */
+        const cur = document.getElementById('cursor');
+        const ring = document.getElementById('cursor-ring');
+        let mx = 0, my = 0, rx = 0, ry = 0;
+        document.addEventListener('mousemove', e => {
+            mx = e.clientX; my = e.clientY;
+            cur.style.left = mx + 'px'; cur.style.top = my + 'px';
+        });
+        (function animCursor() {
+            rx += (mx - rx) * 0.12; ry += (my - ry) * 0.12;
+            ring.style.left = rx + 'px'; ring.style.top = ry + 'px';
+            requestAnimationFrame(animCursor);
+        })();
+
+        /* ════ CANVAS BACKGROUND ════ */
+        (function initCanvas() {
+            const canvas = document.getElementById('bg-canvas');
+            const ctx = canvas.getContext('2d');
+            let W2, H2, pts = [];
+            function resize() { W2 = canvas.width = window.innerWidth; H2 = canvas.height = window.innerHeight; }
+            resize(); window.addEventListener('resize', resize);
+            for (let i = 0; i < 60; i++) pts.push({ x: Math.random() * 2000, y: Math.random() * 1200, vx: (Math.random() - .5) * 0.3, vy: (Math.random() - .5) * 0.3, r: Math.random() * 1.5 + 0.5 });
+            function draw() {
+                ctx.clearRect(0, 0, W2, H2);
+                pts.forEach(p => {
+                    p.x += p.vx; p.y += p.vy;
+                    if (p.x < 0) p.x = W2; if (p.x > W2) p.x = 0;
+                    if (p.y < 0) p.y = H2; if (p.y > H2) p.y = 0;
+                    ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(28,105,212,0.4)'; ctx.fill();
+                });
+                // connections
+                for (let i = 0; i < pts.length; i++) {
+                    for (let j = i + 1; j < pts.length; j++) {
+                        const dx = pts[i].x - pts[j].x, dy = pts[i].y - pts[j].y;
+                        const d = Math.sqrt(dx * dx + dy * dy);
+                        if (d < 120) {
+                            ctx.beginPath(); ctx.moveTo(pts[i].x, pts[i].y); ctx.lineTo(pts[j].x, pts[j].y);
+                            ctx.strokeStyle = `rgba(28,105,212,${0.08 * (1 - d / 120)})`; ctx.lineWidth = 0.5; ctx.stroke();
+                        }
+                    }
+                }
+                requestAnimationFrame(draw);
+            }
+            draw();
+        })();
+
+        /* ════ SPEED LINES (intro) ════ */
+        (function buildSpeedLines() {
+            const c = document.getElementById('speed-lines');
+            for (let i = 0; i < 12; i++) {
+                const l = document.createElement('div'); l.className = 'speed-line';
+                const top = Math.random() * 100, w = Math.random() * 30 + 10, delay = Math.random() * 6, dur = Math.random() * 4 + 3;
+                l.style.cssText = `top:${top}%;width:${w}%;animation-duration:${dur}s;animation-delay:${delay}s;opacity:${Math.random() * 0.4 + 0.1}`;
+                c.appendChild(l);
+            }
+        })();
+
+        /* ════ TRANSITIONS ════ */
+        function startApp() {
+            const intro = document.getElementById('intro'), tr = document.getElementById('transition'), app = document.getElementById('app');
+            intro.style.transition = 'opacity .7s ease'; intro.style.opacity = '0';
+            setTimeout(() => {
+                intro.style.display = 'none'; tr.style.display = 'flex';
+                setTimeout(() => {
+                    tr.style.transition = 'opacity .5s'; tr.style.opacity = '0';
+                    setTimeout(() => { tr.style.display = 'none'; app.style.display = 'flex'; initApp(); }, 500);
+                }, 1600);
+            }, 700);
+        }
+
+        /* ════ INIT ════ */
+        function initApp() {
+            buildGrid(); buildChips('region-chips', REGIONS, selR); buildChips('fuel-chips', FUELS, selF);
+            buildChips('trans-chips', TRANS, selT); buildSwatches();
+        }
+
+        function buildGrid() {
+            const g = document.getElementById('model-grid'); g.innerHTML = '';
+            MODELS.forEach(m => {
+                const meta = DATA.model_meta[m], active = selModel === m;
+                const d = document.createElement('div'); d.className = 'mc' + (active ? ' active' : '');
+                d.innerHTML = `<img class="mc-img" src="${THUMBS[m]}" alt="${m}" loading="lazy" onerror="this.style.display='none'"><div class="mc-info"><div class="mc-name">${m}</div><div class="mc-stat">${(meta.total_sales / 1e6).toFixed(1)}M sales</div></div>`;
+                d.onclick = () => { selModel = m; buildGrid(); renderDash(); };
+                g.appendChild(d);
+            });
+        }
+
+        function buildChips(id, items, set) {
+            const c = document.getElementById(id); c.innerHTML = '';
+            items.forEach(item => { const ch = document.createElement('div'); ch.className = 'chip' + (set.has(item) ? ' on' : ''); ch.textContent = item; ch.onclick = () => { set.has(item) ? set.delete(item) : set.add(item); ch.classList.toggle('on'); }; c.appendChild(ch); });
+        }
+
+        function buildSwatches() {
+            const c = document.getElementById('swatches'); c.innerHTML = '';
+            Object.entries(COLORS).forEach(([name, hex]) => {
+                const d = document.createElement('div'); d.className = 'swatch' + (selC === name ? ' on' : '');
+                d.style.background = hex; d.title = name;
+                d.onclick = () => { if (selC === name) { selC = null; d.classList.remove('on'); } else { document.querySelectorAll('.swatch').forEach(x => x.classList.remove('on')); selC = name; d.classList.add('on'); } };
+                c.appendChild(d);
+            });
+        }
+
+        function applyFilters() { yrFrom = +document.getElementById('yr-from').value || 2010; yrTo = +document.getElementById('yr-to').value || 2024; if (selModel) renderDash(); }
+
+        function resetAll() {
+            selModel = null; selR.clear(); selF.clear(); selT.clear(); selC = null; yrFrom = 2010; yrTo = 2024;
+            document.getElementById('yr-from').value = 2010; document.getElementById('yr-to').value = 2024;
+            buildGrid(); buildChips('region-chips', REGIONS, selR); buildChips('fuel-chips', FUELS, selF);
+            buildChips('trans-chips', TRANS, selT); buildSwatches();
+            document.getElementById('no-sel').style.display = 'flex';
+            document.getElementById('dash').style.display = 'none';
+            Object.values(charts).forEach(c => c.destroy()); charts = {};
+        }
+
+        /* ════ RENDER DASHBOARD ════ */
+        function renderDash() {
+            if (!selModel) return;
+            document.getElementById('no-sel').style.display = 'none';
+            const dash = document.getElementById('dash'); dash.style.display = 'block';
+            Object.values(charts).forEach(c => c.destroy()); charts = {};
+
+            const meta = DATA.model_meta[selModel];
+            const aR = selR.size > 0 ? [...selR] : REGIONS, aF = selF.size > 0 ? [...selF] : FUELS;
+            const aY = YEARS.filter(y => y >= yrFrom && y <= yrTo);
+            let tot = 0;
+            const ySales = aY.map(y => { const v = (DATA.by_model_year[`${selModel}|${y}`] || 0) * (aR.length / REGIONS.length) * (aF.length / FUELS.length); tot += v; return Math.round(v); });
+            const fData = aF.map(f => Math.round((DATA.by_model_fuel[`${selModel}|${f}`] || 0) * aR.length / REGIONS.length));
+            const rData = aR.map(r => DATA.by_model_region[`${selModel}|${r}`] || 0);
+
+            // Gallery order: selected first, then rest
+            const galleryOrder = [selModel, ...MODELS.filter(m => m !== selModel)];
+            const galleryCards = galleryOrder.map((m, i) => {
+                const isF = m === selModel, meta2 = DATA.model_meta[m];
+                return `<div class="gcard${isF ? ' featured' : ''}" onclick="openLb('${IMGS[m]}','${m}','${LABELS[m] || 'BMW'}')" style="opacity:0;transform:translateY(20px);transition:opacity .4s ease ${.5 + i * .06}s,transform .4s ease ${.5 + i * .06}s" data-gi>
+      ${isF ? `<div class="featured-badge">Selected</div>` : ''}
+      <img src="${IMGS[m]}" alt="${m}" loading="lazy" onerror="this.parentElement.style.display='none'">
+      <div class="gcard-body">
+        <div class="gcard-name">${m}</div>
+        <div class="gcard-type">${LABELS[m] || 'BMW Series'}</div>
+        <div class="gcard-tag"><span class="gcard-tag-txt">${(meta2.total_sales / 1e6).toFixed(1)}M sales · avg $${(meta2.avg_price / 1000).toFixed(0)}K</span></div>
+      </div>
+    </div>`;
+            }).join('');
+
+            dash.innerHTML = `
+  <!-- HERO -->
+  <div class="hero">
+    <div class="hero-grid"></div>
+    <div class="hero-beam"></div>
+    <img id="hcar" class="hero-car" src="${IMGS[selModel]}" alt="${selModel}" onerror="this.style.opacity=0">
+    <img id="hcar-r" class="hero-car-ref" src="${IMGS[selModel]}" alt="" onerror="this.style.display='none'">
+    <div class="hero-ground"></div>
+    <div class="hero-glow"></div>
+    <div class="hero-text">
+      <div class="hero-model">${selModel}</div>
+      <div class="hero-series">BMW · ${LABELS[selModel] || 'Performance Series'}</div>
+      <div class="hero-stats">
+        <div class="hstat"><div class="hstat-v">$${(meta.avg_price / 1000).toFixed(0)}K</div><div class="hstat-l">Avg Price</div></div>
+        <div class="hstat"><div class="hstat-v">${(meta.avg_mileage / 1000).toFixed(0)}K</div><div class="hstat-l">Avg KM</div></div>
+        <div class="hstat"><div class="hstat-v">${(meta.total_sales / 1e6).toFixed(1)}M</div><div class="hstat-l">Total Sales</div></div>
+        <div class="hstat"><div class="hstat-v">${meta.count.toLocaleString()}</div><div class="hstat-l">Records</div></div>
+      </div>
+    </div>
+  </div>
+
+  <div class="dash">
+    <!-- KPIs -->
+    <div class="kpi-strip">
+      <div class="kpi" style="animation-delay:.05s"><div class="kpi-v c">${(tot / 1e6).toFixed(1)}M</div><div class="kpi-l">Filtered Sales</div></div>
+      <div class="kpi" style="animation-delay:.1s"><div class="kpi-v">$${meta.avg_price.toLocaleString()}</div><div class="kpi-l">Avg Price (USD)</div></div>
+      <div class="kpi" style="animation-delay:.15s"><div class="kpi-v">${meta.avg_mileage.toLocaleString()}</div><div class="kpi-l">Avg Mileage (KM)</div></div>
+      <div class="kpi" style="animation-delay:.2s"><div class="kpi-v c">${aY.length} yrs</div><div class="kpi-l">Year Span</div></div>
+    </div>
+
+    <!-- Charts -->
+    <div class="charts-row">
+      <div class="chart-box" style="animation-delay:.25s"><div class="chart-hd">📈 Sales by Year</div><div class="chart-wrap"><canvas id="cy"></canvas></div></div>
+      <div class="chart-box" style="animation-delay:.3s"><div class="chart-hd">⛽ Fuel Mix</div><div class="chart-wrap"><canvas id="cf"></canvas></div></div>
+      <div class="chart-box" style="animation-delay:.35s"><div class="chart-hd">🌍 By Region</div><div class="chart-wrap"><canvas id="cr"></canvas></div></div>
+    </div>
+
+    <!-- Gallery -->
+    <div class="gallery-section">
+      <div class="gallery-hdr">
+        <div class="gallery-hdr-title">🚗 &nbsp; Full Model Gallery · All BMW Series</div>
+        <div class="gallery-hdr-count">${MODELS.length} Models</div>
+      </div>
+      <div class="gallery-track">${galleryCards}</div>
+    </div>
+  </div>`;
+
+            /* Animate hero car in */
+            setTimeout(() => { document.getElementById('hcar')?.classList.add('on'); document.getElementById('hcar-r')?.classList.add('on'); }, 120);
+
+            /* Animate gallery cards in */
+            setTimeout(() => { dash.querySelectorAll('[data-gi]').forEach(el => { el.style.opacity = '1'; el.style.transform = 'translateY(0)'; }); }, 300);
+
+            /* Charts */
+            Chart.defaults.color = 'rgba(168,180,200,0.7)'; Chart.defaults.borderColor = 'rgba(0,200,255,0.06)';
+            const gc = 'rgba(0,200,255,0.05)';
+
+            charts.y = new Chart(document.getElementById('cy'), { type: 'line', data: { labels: aY, datasets: [{ data: ySales, borderColor: '#00c8ff', backgroundColor: 'rgba(0,200,255,0.06)', borderWidth: 2, pointBackgroundColor: '#00c8ff', pointRadius: 3, pointHoverRadius: 7, fill: true, tension: 0.4 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { display: false } }, scales: { x: { grid: { color: gc }, ticks: { font: { family: 'Space Mono', size: 9 } } }, y: { grid: { color: gc }, ticks: { font: { family: 'Space Mono', size: 9 }, callback: v => (v / 1e6).toFixed(1) + 'M' } } }, animation: { duration: 1000, easing: 'easeInOutQuart' } } });
+
+            charts.f = new Chart(document.getElementById('cf'), { type: 'doughnut', data: { labels: aF, datasets: [{ data: fData, backgroundColor: ['rgba(231,76,60,.8)', 'rgba(52,152,219,.8)', 'rgba(46,204,113,.8)', 'rgba(243,156,18,.8)'], borderColor: ['#e74c3c', '#3498db', '#2ecc71', '#f39c12'], borderWidth: 2, hoverOffset: 14 }] }, options: { responsive: true, maintainAspectRatio: false, plugins: { legend: { position: 'bottom', labels: { padding: 10, font: { family: 'Rajdhani', size: 11 }, boxWidth: 10 } } }, animation: { duration: 1000, easing: 'easeInOutQuart' } } });
+
+            charts.r = new Chart(document.getElementById('cr'), { type: 'bar', data: { labels: aR, datasets: [{ data: rData, backgroundColor: 'rgba(0,200,255,0.15)', borderColor: 'rgba(0,200,255,0.7)', borderWidth: 1, borderRadius: 3, hoverBackgroundColor: 'rgba(0,200,255,0.35)' }] }, options: { responsive: true, maintainAspectRatio: false, indexAxis: 'y', plugins: { legend: { display: false } }, scales: { x: { grid: { color: gc }, ticks: { font: { family: 'Space Mono', size: 8 }, callback: v => (v / 1e6).toFixed(1) + 'M' } }, y: { grid: { color: 'transparent' }, ticks: { font: { family: 'Space Mono', size: 8 } } } }, animation: { duration: 900, easing: 'easeInOutQuart' } } });
+        }
+
+        /* ════ LIGHTBOX ════ */
+        function openLb(src, model, series) {
+            document.getElementById('lb-img').src = src;
+            document.getElementById('lb-model').textContent = 'BMW ' + model;
+            document.getElementById('lb-series').textContent = series;
+            document.getElementById('lb').classList.add('show');
+        }
+        function closeLb() { document.getElementById('lb').classList.remove('show'); }
+        document.addEventListener('keydown', e => { if (e.key === 'Escape') closeLb(); });
+    </script>
+</body>
+
+</html>
